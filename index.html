@@ -251,6 +251,7 @@
   .tip { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 0; }
   .tip b { color: var(--sun); }
 
+  .res-grid, .res-foot { display: flex; flex-direction: column; gap: 18px; }
   table.res { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   table.res td { padding: 8px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); font-weight: 600; }
   table.res td.p { font-family: var(--display); font-size: 24px; width: 44px; color: var(--muted); }
@@ -310,6 +311,30 @@
   body.touch .hud-br .spd { display: none; }
   body.touch .pos #posNum { font-size: 72px; }
   body.touch .pos #posSuf { font-size: 28px; }
+  #tPause {
+    left: 50%; top: calc(12px + env(safe-area-inset-top, 0px));
+    transform: translateX(-50%);
+    width: 46px !important; height: 46px !important; font-size: 16px !important;
+    font-family: var(--ui) !important; font-weight: 700; letter-spacing: 0.1em;
+  }
+
+  /* ---------- Rotate prompt (phones held upright) ---------- */
+  #rotate {
+    display: none;
+    position: fixed; inset: 0; z-index: 60;
+    place-items: center; text-align: center;
+    padding-inline: 24px;
+    background: var(--ink);
+    color: var(--paper);
+  }
+  #rotate .rot { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 320px; }
+  #rotate svg { width: 96px; height: 96px; animation: tilt 2.4s ease-in-out infinite; }
+  #rotate b { font-family: var(--display); font-weight: 400; font-size: 34px; line-height: 1; color: var(--sun); }
+  #rotate span { font-size: 15px; line-height: 1.4; color: var(--muted); }
+  @keyframes tilt { 0%, 25% { transform: rotate(0deg); } 55%, 100% { transform: rotate(-90deg); } }
+  @media (orientation: portrait) and (max-width: 700px) {
+    body.touch #rotate { display: grid; }
+  }
 
   @media (max-width: 640px) {
     #minimap { width: 110px; height: 110px; right: 12px; }
@@ -324,8 +349,85 @@
     .chips { grid-template-columns: repeat(2, 1fr); }
     .keys { grid-template-columns: 1fr; }
   }
+
+  /* ---------- Compact layout: phones on their side (short, wide screens) ---------- */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .hud-tl { top: calc(10px + env(safe-area-inset-top, 0px)); left: calc(14px + env(safe-area-inset-left, 0px)); gap: 8px; }
+    .slot { width: 54px; height: 54px; }
+    .slot-in { width: 40px; height: 40px; }
+    .laps { padding: 4px 12px; }
+    .laps b { font-size: 24px; }
+    .laps .of { font-size: 15px; }
+    .laps .time { font-size: 14px; }
+    #minimap { width: 100px; height: 100px; top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); }
+    #audioCtl { top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(126px + env(safe-area-inset-right, 0px)); gap: 6px; }
+    #audioCtl button { height: 30px; padding: 0 9px 0 7px; font-size: 11px; border-width: 2px; }
+    #audioCtl button svg { width: 16px; height: 16px; }
+    #hud[hidden] ~ #audioCtl { top: auto; bottom: calc(5px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); }
+    .hud-br { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+    .pos #posNum, body.touch .pos #posNum { font-size: 64px; -webkit-text-stroke-width: 3px; text-shadow: 0 4px 0 var(--ink); }
+    .pos #posSuf, body.touch .pos #posSuf { font-size: 24px; margin-top: 6px; }
+    body.touch .hud-br {
+      top: calc(74px + env(safe-area-inset-top, 0px)); bottom: auto;
+      left: calc(14px + env(safe-area-inset-left, 0px)); right: auto;
+      align-items: flex-start;
+    }
+    #center { font-size: 88px; top: 24%; }
+    #toast { font-size: 24px; top: calc(70px + env(safe-area-inset-top, 0px)); }
+    #watermark { font-size: 11px; bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
+    #tPause { top: calc(10px + env(safe-area-inset-top, 0px)); width: 40px !important; height: 40px !important; font-size: 14px !important; }
+
+    /* thumbs: steer on the left, drift / item / brake on the right */
+    #tLeft, #tRight, #tDrift { width: 80px !important; height: 80px !important; }
+    #tLeft { left: calc(18px + env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+    #tRight { left: calc(108px + env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+    #tDrift { right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+    #tItem { width: 64px !important; height: 64px !important; right: calc(110px + env(safe-area-inset-right, 0px)); bottom: calc(46px + env(safe-area-inset-bottom, 0px)); }
+    #tBrake { right: calc(28px + env(safe-area-inset-right, 0px)); bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
+
+    /* menus fit on one screen */
+    .overlay { padding-block: calc(8px + env(safe-area-inset-top, 0px)) calc(34px + env(safe-area-inset-bottom, 0px)); }
+    .card { gap: 10px; padding: 0 16px 14px; }
+    .checker { height: 12px; margin-inline: -16px; background-size: 12px 12px; }
+    .cols { grid-template-columns: 1fr 1fr; gap: 16px; }
+    .col { gap: 10px; }
+    .group { gap: 6px; }
+    .eyebrow { font-size: 10px; }
+    .logo { font-size: 34px; -webkit-text-stroke-width: 2px; text-shadow: 0 3px 0 var(--flag); }
+    .trk { padding-bottom: 6px; }
+    .trk .band { height: 16px; margin-bottom: 3px; }
+    .trk .tn { font-size: 9px; }
+    .trk b { font-size: 15px; }
+    .trk small { font-size: 10px; }
+    .trk .lock { font-size: 9px; top: 2px; padding: 1px 4px; }
+    .chips { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .chip { padding: 5px 6px; gap: 6px; font-size: 13px; }
+    .chip small { display: none; }
+    .chip i { width: 16px; height: 16px; }
+    .seg { gap: 6px; }
+    .seg button { padding: 5px 4px; font-size: 13px; }
+    .seg button small { display: none; }
+    .go { font-size: 22px; padding: 7px 14px; }
+    .btn { padding: 8px 12px; font-size: 14px; }
+    .card h2 { font-size: 30px; }
+    table.res td { padding: 3px 6px; }
+    table.res td.p { font-size: 18px; }
+    /* results: standings on the right, heading and buttons on the left */
+    .res-card { width: min(780px, 100%); }
+    .res-grid {
+      display: grid; gap: 10px 20px; align-items: start;
+      grid-template-columns: 1fr 1.1fr;
+      grid-template-areas: "head table" "foot table";
+    }
+    .res-head { grid-area: head; }
+    .res-grid table.res { grid-area: table; }
+    .res-foot { grid-area: foot; gap: 10px; }
+    .tip { font-size: 12px; }
+    body.touch #title .tip, body.touch .keys { display: none; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    #center.pop, #toast.show, .slot.flash { animation: none; }
+    #center.pop, #toast.show, .slot.flash, #rotate svg { animation: none; }
   }
 </style>
 </head>
@@ -356,6 +458,19 @@
   <button id="tDrift">DRIFT</button>
   <button id="tItem">ITEM</button>
   <button id="tBrake">BRAKE</button>
+  <button id="tPause" aria-label="Pause">II</button>
+</div>
+
+<div id="rotate" role="alert">
+  <div class="rot">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="18" y="4" width="28" height="56" rx="6" fill="#2B2150" stroke="#FFFFFF" stroke-width="3"/>
+      <rect x="23" y="11" width="18" height="38" rx="2" fill="#FFD23F"/>
+      <circle cx="32" cy="54" r="2.2" fill="#FFFFFF"/>
+    </svg>
+    <b>Rotate your phone</b>
+    <span>Rocket Road GP plays sideways. Turn your phone to landscape to race.</span>
+  </div>
 </div>
 
 <div id="watermark">Designed by Okiemute Vadan Ejite-Orode</div>
@@ -426,20 +541,24 @@
 </div>
 
 <div id="results" class="overlay" hidden>
-  <div class="card">
+  <div class="card res-card">
     <div class="checker"></div>
-    <div class="group">
-      <div class="eyebrow" id="resSub">Pepper Hill &middot; 100cc</div>
-      <h2 id="resTitle">You finished 1st</h2>
-    </div>
-    <table class="res"><tbody id="resBody"></tbody></table>
-    <p class="tip" id="resBest"></p>
-    <div class="row-btns">
-      <button class="go" id="nextBtn">Next track</button>
-    </div>
-    <div class="row-btns">
-      <button class="btn" id="againBtn">Race again</button>
-      <button class="btn" id="menuBtn">Main menu</button>
+    <div class="res-grid">
+      <div class="group res-head">
+        <div class="eyebrow" id="resSub">Pepper Hill &middot; 100cc</div>
+        <h2 id="resTitle">You finished 1st</h2>
+      </div>
+      <table class="res"><tbody id="resBody"></tbody></table>
+      <div class="res-foot">
+        <p class="tip" id="resBest"></p>
+        <div class="row-btns">
+          <button class="go" id="nextBtn">Next track</button>
+        </div>
+        <div class="row-btns">
+          <button class="btn" id="againBtn">Race again</button>
+          <button class="btn" id="menuBtn">Main menu</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -2191,6 +2310,36 @@ function bindTouch(id, key) {
   el.addEventListener('pointerleave', off);
 }
 bindTouch('#tLeft', 'left'); bindTouch('#tRight', 'right'); bindTouch('#tDrift', 'drift'); bindTouch('#tItem', 'item'); bindTouch('#tBrake', 'brake');
+$('#tPause').addEventListener('click', () => { if (state === 'race' || state === 'countdown') setPaused(true); });
+
+// Phones: go full screen and lock to landscape where the browser allows it (Android).
+// Browsers that refuse (iPhone, embedded views) fall back to the rotate prompt.
+function lockLandscape() {
+  try {
+    const o = screen.orientation;
+    if (o && o.lock) o.lock('landscape').catch(() => {});
+  } catch (e) { /* not supported */ }
+}
+function goLandscape() {
+  if (!isTouch) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (document.fullscreenElement || document.webkitFullscreenElement || !req) { lockLandscape(); return; }
+  try {
+    const p = req.call(el, { navigationUI: 'hide' });
+    if (p && p.then) p.then(lockLandscape).catch(() => {});
+    else lockLandscape();
+  } catch (e) { /* full screen refused */ }
+}
+// turning the phone upright mid-race pauses it (the rotate prompt covers the screen)
+const portraitMQ = matchMedia('(orientation: portrait) and (max-width: 700px)');
+const onOrientation = () => {
+  if (isTouch && portraitMQ.matches && (state === 'race' || state === 'countdown')) setPaused(true);
+  setTimeout(resize, 250); // some phones report the new size a moment late
+};
+if (portraitMQ.addEventListener) portraitMQ.addEventListener('change', onOrientation);
+else if (portraitMQ.addListener) portraitMQ.addListener(onOrientation);
+window.addEventListener('orientationchange', onOrientation);
 function enableTouch() {
   if (isTouch) return;
   isTouch = true;
@@ -2444,6 +2593,7 @@ function updateRanks() {
 }
 
 function startRace() {
+  goLandscape();
   initAudio();
   if (AC && AC.state === 'suspended') AC.resume();
   Music.play(levelIdx, false); // ambience during the countdown, the tune starts on GO
@@ -2497,7 +2647,7 @@ function showResults() {
     $('#resBest').insertAdjacentHTML('beforeend', `<br><span class="unlock">You've conquered every track!</span>`);
   }
   renderResults();
-  (nextOpen ? $('#nextBtn') : $('#againBtn')).focus();
+  (nextOpen ? $('#nextBtn') : $('#againBtn')).focus({ preventScroll: true });
   Music.fast = false;
   Music.go();
 }
