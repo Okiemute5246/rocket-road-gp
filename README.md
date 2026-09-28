@@ -2,6 +2,16 @@
 
 A 3D kart racer that runs in the browser. Race five computer rivals over three laps, drift for mini-turbos, grab items and unlock all four tracks.
 
+![Title screen](screenshots/01-title.png)
+
+| Pepper Hill | Cloud Nine Skyway |
+|---|---|
+| ![Pepper Hill](screenshots/02-pepper-hill.png) | ![Cloud Nine Skyway](screenshots/03-cloud-nine-skyway.png) |
+| **Coral Causeway** | **Magma Mountain** |
+| ![Coral Causeway](screenshots/04-coral-causeway.png) | ![Magma Mountain volcano](screenshots/05-magma-mountain-volcano.png) |
+
+![The tunnel through Magma Mountain](screenshots/06-magma-mountain-tunnel.png)
+
 ## Tracks
 
 | # | Track | Setting |
