@@ -56,7 +56,7 @@ Up to 6 people can race, and computer rivals fill the empty places. The host can
 
 ### How it works
 
-Players connect to each other directly in the browser (WebRTC), through [PeerJS](https://peerjs.com/). PeerJS's free public server only introduces the players to each other. If two networks can't connect directly (phone data, school or work Wi-Fi, some routers), a relay from [Metered](https://www.metered.ca/stun-turn) carries the traffic instead. Its credentials link is `TURN_CREDENTIALS_URL` in `index.html`. There is no game server to run, so online play works on GitHub Pages as it is.
+Players connect to each other directly in the browser (WebRTC), through [PeerJS](https://peerjs.com/). PeerJS's free public server only introduces the players to each other. If two networks can't connect directly (phone data, school or work Wi-Fi, some routers), a relay from [Metered](https://www.metered.ca/stun-turn) carries the traffic instead. The relay's passwords come from a small [Cloudflare Worker](worker/turn-credentials.js) (`TURN_CREDENTIALS_URL` in `index.html`), so the Metered key never appears in the game's code. The key is stored as the Worker's `METERED_API_KEY` secret, and the Worker only answers requests from the game's website. Apart from that Worker, there is no server to run, so online play works on GitHub Pages as it is.
 
 Every player's computer drives their own kart, so steering never waits on the internet. Each kart's position goes out 20 times a second, and other people's karts glide between updates. The host's computer also drives the computer rivals and the volcano. Shells and bananas are announced when they're thrown, and the computer of the kart that gets hit decides the hit.
 

@@ -3088,10 +3088,10 @@ window.addEventListener('keydown', wakeAudio);
 // onClose). Nothing outside this section knows about PeerJS.
 const PEER_PREFIX = 'rocketroad-gp-';
 // When two networks can't connect directly (phone data, school or work Wi-Fi, some routers), a TURN
-// relay carries the traffic. Paste a TURN credentials link here, for example the one from a free
-// metered.ca account (https://<app>.metered.live/api/v1/turn/credentials?apiKey=...). Without one,
-// players on those networks can't reach each other.
-const TURN_CREDENTIALS_URL = 'https://rocketroadgp.metered.live/api/v1/turn/credentials?apiKey=3aa41421f0e98ee0a9718cc195c342e2d0c8';
+// relay carries the traffic. The relay passwords come from our Cloudflare Worker
+// (worker/turn-credentials.js), which keeps the metered.ca key secret. Without it, players on
+// those networks can't reach each other.
+const TURN_CREDENTIALS_URL = 'https://rocketroad-turn.okiemuteorode.workers.dev';
 const STUN_SERVERS = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
   { urls: 'stun:stun.cloudflare.com:3478' },
