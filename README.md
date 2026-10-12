@@ -39,7 +39,11 @@ Each track has its own music and background sounds, generated live with the Web 
 | N | Music on/off |
 | M | Sound effects on/off |
 
-On phones and tablets, on-screen buttons appear and the kart accelerates by itself.
+### On a phone
+
+Hold your phone sideways. The kart accelerates by itself, ◀ ▶ steer on the left, and **Drift**, **Item** and **Brake** sit on the right, with a pause button at the top. On Android, tapping **Start race** switches to full screen and locks the phone to landscape. On iPhone, turn it sideways yourself (the game asks you to when it's held upright).
+
+![Racing on a phone in landscape](screenshots/07-phone-landscape.png)
 
 ## Run it locally
 
