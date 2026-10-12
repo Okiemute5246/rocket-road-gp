@@ -3087,8 +3087,34 @@ window.addEventListener('keydown', wakeAudio);
 // same methods (host, join, send, sendTo, sendAll, kick, close) and callbacks (onMessage, onLeave,
 // onClose). Nothing outside this section knows about PeerJS.
 const PEER_PREFIX = 'rocketroad-gp-';
+// When two networks can't connect directly (phone data, school or work Wi-Fi, some routers), a TURN
+// relay carries the traffic. Paste a TURN credentials link here, for example the one from a free
+// metered.ca account (https://<app>.metered.live/api/v1/turn/credentials?apiKey=...). Without one,
+// players on those networks can't reach each other.
+const TURN_CREDENTIALS_URL = 'https://rocketroadgp.metered.live/api/v1/turn/credentials?apiKey=3aa41421f0e98ee0a9718cc195c342e2d0c8';
+const STUN_SERVERS = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+];
+let iceServers = null;
+async function getIceServers() {
+  if (iceServers) return iceServers;
+  let relays = [];
+  if (TURN_CREDENTIALS_URL) {
+    try {
+      const ctl = new AbortController(), stop = setTimeout(() => ctl.abort(), 5000);
+      const r = await fetch(TURN_CREDENTIALS_URL, { signal: ctl.signal });
+      clearTimeout(stop);
+      const list = await r.json();
+      if (Array.isArray(list)) relays = list;
+    } catch (e) { /* carry on without the relay */ }
+  }
+  iceServers = [...STUN_SERVERS, ...relays];
+  return iceServers;
+}
 function peerTransport() {
-  let peer = null, beat = 0;
+  let peer = null, beat = 0, onVisible = null;
   const conns = new Map(); // peer id -> data connection
   const seen = new Map();  // peer id -> when we last heard from it
   const T = { id: '', isHost: false, onMessage() {}, onLeave() {}, onClose() {} };
@@ -3113,37 +3139,74 @@ function peerTransport() {
       }
     }, 3000);
   };
-  const open = id => new Promise((resolve, reject) => {
-    if (!window.Peer) { reject({ type: 'no-library' }); return; }
-    peer = id ? new Peer(id, { debug: 0 }) : new Peer({ debug: 0 });
-    const timer = setTimeout(() => reject({ type: 'timeout' }), 12000);
+  const open = async id => {
+    if (!window.Peer) throw { type: 'no-library' };
+    const opts = { debug: 0, config: { iceServers: await getIceServers() } };
+    await new Promise((resolve, reject) => openPeer(id, opts, resolve, reject));
+  };
+  const openPeer = (id, opts, resolve, reject) => {
+    peer = id ? new Peer(id, opts) : new Peer(opts);
+    const timer = setTimeout(() => reject({ type: 'server-timeout' }), 15000);
     peer.on('open', pid => { clearTimeout(timer); T.id = pid; resolve(); });
     peer.on('error', e => { clearTimeout(timer); reject(e); }); // does nothing once open
-  });
+  };
   const put = (c, msg) => { if (c && c.open) { try { c.send(msg); } catch (e) { /* closing */ } } };
   T.host = async code => {
     T.isHost = true;
     await open(PEER_PREFIX + code);
     peer.on('connection', c => { wire(c); c.on('open', () => add(c)); });
     // losing the matchmaking service only stops new guests joining, so try to get it back
-    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+    const rejoin = () => { if (peer && !peer.destroyed && peer.disconnected) peer.reconnect(); };
+    peer.on('disconnected', () => setTimeout(rejoin, 1000));
+    // phones drop the connection while the host is away sharing the code, so check on coming back
+    onVisible = () => { if (!document.hidden) rejoin(); };
+    document.addEventListener('visibilitychange', onVisible);
     heartbeat();
   };
   T.join = async code => {
     await open();
-    await new Promise((resolve, reject) => {
-      const c = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
-      const timer = setTimeout(() => reject({ type: 'timeout' }), 12000);
-      peer.on('error', e => { clearTimeout(timer); reject(e); });
-      c.on('open', () => { clearTimeout(timer); add(c); wire(c); resolve(); });
-    });
-    heartbeat();
+    let lastErr = null;
+    for (let tries = 0; tries < 2; tries++) {
+      try { await connect(code); heartbeat(); return; }
+      catch (e) { lastErr = e; if (e.type === 'peer-unavailable') break; }
+    }
+    throw lastErr;
   };
+  const connect = code => new Promise((resolve, reject) => {
+    const c = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
+    let done = false, reached = false;
+    const finish = err => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      peer.off('error', onErr);
+      if (err) { try { c.close(); } catch (e) { /* never opened */ } reject(err); } else resolve();
+    };
+    const timer = setTimeout(() => finish({ type: reached ? 'ice-failed' : 'timeout' }), 20000);
+    const onErr = e => finish(e);
+    peer.on('error', onErr);
+    c.on('open', () => { add(c); wire(c); finish(); });
+    // the host answered, but the two networks still have to find a way through to each other
+    const watch = () => {
+      const pc = c.peerConnection;
+      if (!pc) { if (!done) setTimeout(watch, 200); return; }
+      pc.addEventListener('signalingstatechange', () => { if (pc.signalingState === 'stable') reached = true; });
+      pc.addEventListener('iceconnectionstatechange', () => {
+        if (pc.iceConnectionState === 'failed') finish({ type: 'ice-failed' });
+      });
+    };
+    watch();
+  });
   T.send = msg => { for (const c of conns.values()) put(c, msg); }; // guest -> host
   T.sendTo = (id, msg) => put(conns.get(id), msg);
   T.sendAll = (msg, except) => { for (const [id, c] of conns) if (id !== except) put(c, msg); };
   T.kick = id => { const c = conns.get(id); if (c) { conns.delete(id); c.close(); } };
-  T.close = () => { clearInterval(beat); conns.clear(); if (peer) { peer.destroy(); peer = null; } };
+  T.close = () => {
+    clearInterval(beat);
+    if (onVisible) document.removeEventListener('visibilitychange', onVisible);
+    conns.clear();
+    if (peer) { peer.destroy(); peer = null; }
+  };
   return T;
 }
 
@@ -3404,7 +3467,9 @@ function lobbyNote(text, err) { const el = $('#lobbyMsg'); el.textContent = text
 function netErrorText(e) {
   const type = e && e.type;
   if (type === 'peer-unavailable') return "There's no room with that code. Check it and try again.";
-  if (type === 'timeout') return "Couldn't connect to that room. Check the code and try again.";
+  if (type === 'timeout') return "The room didn't answer. Check the code, and ask the host to keep the game open on their screen.";
+  if (type === 'ice-failed') return "Found the room, but your two networks couldn't link up. Try another Wi-Fi or phone data.";
+  if (type === 'server-timeout') return "The online service took too long to answer. Check your internet connection and try again.";
   if (type === 'browser-incompatible') return "This browser can't play online. Try Chrome, Edge, Firefox or Safari.";
   if (type === 'no-library') return "Online play didn't load. Check your internet connection and reload the page.";
   return "Couldn't reach the online service. Check your internet connection and try again.";
