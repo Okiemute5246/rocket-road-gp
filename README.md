@@ -1,6 +1,6 @@
 # Rocket Road GP
 
-A 3D kart racer that runs in the browser. Race five computer rivals over three laps, drift for mini-turbos, grab items and unlock all four tracks.
+A 3D kart racer that runs in the browser. Race five computer rivals over three laps, or up to five friends online. Drift for mini-turbos, grab items and unlock all four tracks.
 
 ![Title screen](screenshots/01-title.png)
 
@@ -45,9 +45,26 @@ Hold your phone sideways. The kart accelerates by itself, ◀ ▶ steer on the l
 
 ![Racing on a phone in landscape](screenshots/07-phone-landscape.png)
 
+## Play online with friends
+
+1. On the title screen choose **Play online with friends**, type your name and choose **Host a race**.
+2. You get a 4-letter room code. Send it to your friends, or use **Copy invite link** (**Share invite link** on phones) so they land straight on the join screen.
+3. Friends choose **Play online with friends**, type the code and choose **Join**.
+4. Everyone picks a driver (each driver can only be taken once). The host picks the track and engine class, then starts the race.
+
+Up to 6 people can race, and computer rivals fill the empty places. The host can only choose tracks they have unlocked. Online races don't pause: **Esc** opens a menu while your kart waits on the track. If a guest leaves mid-race, a computer rival takes over their kart. If the host leaves, the room closes.
+
+### How it works
+
+Players connect to each other directly in the browser (WebRTC), through [PeerJS](https://peerjs.com/). PeerJS's free public server only introduces the players to each other. If a network blocks direct connections, PeerJS's relay servers carry the traffic instead. There is no game server to run, so online play works on GitHub Pages as it is.
+
+Every player's computer drives their own kart, so steering never waits on the internet. Each kart's position goes out 20 times a second, and other people's karts glide between updates. The host's computer also drives the computer rivals and the volcano. Shells and bananas are announced when they're thrown, and the computer of the kart that gets hit decides the hit.
+
+All messages pass through the host. The connection code (`peerTransport()` in `index.html`) is kept separate from the game, so it can be swapped for a WebSocket game server later without changing the race code.
+
 ## Run it locally
 
-The game is a single `index.html` file. Three.js and the fonts load from public CDNs, so you need an internet connection.
+The game is a single `index.html` file. Three.js, PeerJS and the fonts load from public CDNs, so you need an internet connection.
 
 Opening the file directly works, but serving it is closer to how it runs online:
 
@@ -67,5 +84,6 @@ Then open http://localhost:8000.
 ## Built with
 
 - [Three.js](https://threejs.org/) r128 for the 3D graphics
+- [PeerJS](https://peerjs.com/) 1.5.5 for online races
 - Web Audio API for the music and sound effects
 - Google Fonts: Racing Sans One and Chakra Petch

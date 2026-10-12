@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Rocket Road GP</title>
-<meta name="description" content="A 3D kart racer in your browser: four tracks to unlock, drifting, items and five rivals.">
+<meta name="description" content="A 3D kart racer in your browser: four tracks to unlock, drifting, items, five rivals and online races with friends.">
 <meta name="theme-color" content="#1B1330">
 <meta name="author" content="Okiemute Vadan Ejite-Orode">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231B1330'/%3E%3Cpath d='M7 21h18l-2-6H11z' fill='%23E8363C'/%3E%3Ccircle cx='11' cy='22' r='3' fill='%23FFD23F'/%3E%3Ccircle cx='22' cy='22' r='3' fill='%23FFD23F'/%3E%3C/svg%3E">
@@ -251,6 +251,42 @@
   .tip { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 0; }
   .tip b { color: var(--sun); }
 
+  /* ---------- Online ---------- */
+  .field {
+    font-family: var(--ui); font-weight: 700; font-size: 18px;
+    color: var(--paper); background: var(--ink-2);
+    border: 2px solid rgba(255, 255, 255, 0.25); border-radius: 6px;
+    padding: 10px 12px; width: 100%; box-sizing: border-box;
+    -webkit-user-select: text; user-select: text;
+  }
+  .field:focus { outline: none; border-color: var(--sun); box-shadow: inset 0 0 0 1px var(--sun); }
+  .field::placeholder { color: rgba(185, 176, 216, 0.6); }
+  #codeIn { font-family: var(--display); font-weight: 400; font-size: 26px; letter-spacing: 0.3em; text-transform: uppercase; padding-block: 6px; }
+  .join-row { display: flex; gap: 10px; }
+  .join-row .field { flex: 1; min-width: 0; }
+  .join-row .btn { flex: none; min-width: 96px; }
+  .net-msg { min-height: 1.45em; color: var(--sun); font-weight: 600; }
+  .net-msg.err { color: #FF9A9A; }
+  .online-or { display: flex; align-items: center; gap: 12px; }
+  .online-or::before, .online-or::after { content: ''; flex: 1; height: 2px; background: rgba(255, 255, 255, 0.15); }
+  .room-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .room-code {
+    font-family: var(--display); font-weight: 400; font-size: 56px; line-height: 1; letter-spacing: 0.12em;
+    color: var(--sun);
+    -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill;
+    text-shadow: 0 4px 0 var(--flag);
+    -webkit-user-select: text; user-select: text;
+  }
+  .plist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .plist li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--ink-2); border-radius: 6px; font-weight: 700; min-width: 0; }
+  .plist li i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--paper); flex: none; }
+  .plist li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plist li small { margin-left: auto; flex: none; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .plist li.me { box-shadow: inset 0 0 0 2px var(--sun); }
+  .plist li.cpu { background: transparent; border: 2px dashed rgba(255, 255, 255, 0.18); color: var(--muted); font-weight: 600; }
+  .lobby-race { margin: 0; font-weight: 700; font-size: 16px; }
+  .chip:disabled { opacity: 0.4; cursor: not-allowed; }
+
   .res-grid, .res-foot { display: flex; flex-direction: column; gap: 18px; }
   table.res { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   table.res td { padding: 8px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); font-weight: 600; }
@@ -424,6 +460,12 @@
     .res-foot { grid-area: foot; gap: 10px; }
     .tip { font-size: 12px; }
     body.touch #title .tip, body.touch .keys { display: none; }
+    .field { font-size: 15px; padding: 6px 10px; }
+    #codeIn { font-size: 20px; padding-block: 3px; }
+    .room-code { font-size: 36px; text-shadow: 0 3px 0 var(--flag); }
+    .plist { gap: 4px; }
+    .plist li { padding: 4px 8px; font-size: 13px; }
+    .plist li i { width: 14px; height: 14px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -512,6 +554,7 @@
           </div>
         </div>
         <button class="go" id="startBtn">Start race</button>
+        <button class="btn" id="onlineBtn">Play online with friends</button>
         <div class="keys">
           <div><kbd>W</kbd><kbd>&uarr;</kbd> Accelerate</div>
           <div><kbd>S</kbd><kbd>&darr;</kbd> Brake / reverse</div>
@@ -529,7 +572,8 @@
 <div id="pause" class="overlay" hidden>
   <div class="card">
     <div class="checker"></div>
-    <h2>Paused</h2>
+    <h2 id="pauseTitle">Paused</h2>
+    <p class="tip" id="pauseTip" hidden>Online races don't stop: your kart waits on the track while this menu is open.</p>
     <div class="row-btns">
       <button class="go" id="resumeBtn">Resume</button>
     </div>
@@ -563,7 +607,80 @@
   </div>
 </div>
 
+<div id="online" class="overlay" hidden>
+  <div class="card">
+    <div class="checker"></div>
+    <h2>Play online</h2>
+    <div class="group">
+      <label class="lbl" for="nickIn">Your name</label>
+      <input class="field" id="nickIn" maxlength="12" autocomplete="nickname" spellcheck="false" placeholder="Up to 12 letters">
+    </div>
+    <div class="group">
+      <div class="lbl">Host a race</div>
+      <p class="tip">You get a room code to send to your friends. Up to 6 people can race, and computer rivals fill the empty places.</p>
+      <button class="go" id="hostBtn">Host a race</button>
+    </div>
+    <div class="online-or lbl">or</div>
+    <div class="group">
+      <label class="lbl" for="codeIn">Join a friend's race</label>
+      <div class="join-row">
+        <input class="field" id="codeIn" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE">
+        <button class="btn" id="joinBtn">Join</button>
+      </div>
+    </div>
+    <p class="tip net-msg" id="onlineMsg" role="status"></p>
+    <button class="btn" id="onlineBack">Back</button>
+  </div>
+</div>
+
+<div id="lobby" class="overlay" hidden>
+  <div class="card wide">
+    <div class="checker"></div>
+    <div class="cols">
+      <div class="col">
+        <div class="group">
+          <div class="eyebrow">Online race &middot; room code</div>
+          <div class="room-row">
+            <b class="room-code" id="roomCode">----</b>
+            <button class="btn" id="copyBtn">Copy invite link</button>
+          </div>
+          <p class="tip">Friends choose <b>Play online with friends</b> and type this code, or open the invite link.</p>
+        </div>
+        <div class="group">
+          <div class="lbl">Racers <span id="lobbyCount"></span></div>
+          <ul class="plist" id="plist"></ul>
+        </div>
+      </div>
+      <div class="col">
+        <div class="group">
+          <div class="lbl">Your driver</div>
+          <div class="chips" id="lobbyChips"></div>
+        </div>
+        <div class="group" id="hostOpts">
+          <div class="lbl">Track</div>
+          <div class="tracks" id="lobbyTracks"></div>
+          <div class="lbl">Engine class</div>
+          <div class="seg" id="lobbyClass">
+            <button data-c="50cc">50cc<small>Easy</small></button>
+            <button data-c="100cc">100cc<small>Normal</small></button>
+            <button data-c="150cc">150cc<small>Fast</small></button>
+          </div>
+        </div>
+        <div class="group" id="guestOpts">
+          <div class="lbl">Next race</div>
+          <p class="lobby-race" id="lobbyRace"></p>
+          <p class="tip" id="lobbyWait"></p>
+        </div>
+        <button class="go" id="lobbyStart">Start race</button>
+        <p class="tip net-msg" id="lobbyMsg" role="status"></p>
+        <button class="btn" id="leaveBtn">Leave room</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
 <script>
 (() => {
 'use strict';
@@ -575,6 +692,8 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const rand = (a, b) => a + Math.random() * (b - a);
 const hash = x => { const s = Math.sin(x * 12.9898) * 43758.5453; return s - Math.floor(s); };
 const wrapA = a => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
+const r2 = v => Math.round(v * 100) / 100;
+const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const V3 = THREE.Vector3;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -717,6 +836,7 @@ let TP = [], TT = [], TS = [];
 const SLOPE = new Float32Array(N), wallL = new Float32Array(N), wallR = new Float32Array(N);
 let SEG = 1, PADS = [], boxes = [], tunnel = null;
 let levelGroup = null, levelHooks = {}, levelIdx = 0, L = null;
+let net = null; // the online room, or null when racing offline (see "online" below)
 const wi = i => ((i % N) + N) % N;
 const headingAt = i => Math.atan2(TT[i].x, TT[i].z);
 const fv = (f, j) => typeof f === 'function' ? f(j) : f;
@@ -1240,8 +1360,17 @@ function decoVolcano(E) {
   const bombMat = new THREE.MeshBasicMaterial({ color: 0xff7a1a });
   let bombT = 3, smokeT = 0;
   const clearBombs = () => { for (const b of bombs) { levelGroup.remove(b.ring, b.mesh); b.ring.material.dispose(); } bombs.length = 0; };
+  const dropBomb = (i, lat) => {
+    const to = new V3(TP[i].x + TS[i].x * lat, TP[i].y, TP[i].z + TS[i].z * lat);
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+    ring.position.set(to.x, to.y + 0.08, to.z);
+    const mesh = new THREE.Mesh(bombGeo, bombMat);
+    levelGroup.add(ring, mesh);
+    bombs.push({ t: 0, dur: 2.6, from: top.clone(), to, ring, mesh });
+  };
   return {
     reset() { clearBombs(); bombT = 3; },
+    bomb: dropBomb, // online guests drop the bombs the host aims
     update(dt, t) {
       lavaTex.offset.set(t * 0.02, t * 0.015);
       flowTex.offset.y = t * 0.08;
@@ -1254,7 +1383,7 @@ function decoVolcano(E) {
       }
       for (let q = 0; q < 2; q++) emit(sparks, top.x + rand(-12, 12), top.y, top.z + rand(-12, 12), rand(-18, 18), rand(35, 70), rand(-18, 18), Math.random() < 0.5 ? 0xff7a1a : 0xffd23f, 2.8, 12, 30);
       // bombs aimed just ahead of racers
-      if (state === 'race' && karts.length) {
+      if (state === 'race' && karts.length && (!net || net.host)) {
         bombT -= dt;
         if (bombT <= 0) {
           bombT = rand(1.6, 3.2);
@@ -1262,14 +1391,9 @@ function decoVolcano(E) {
           const i = wi(k.idx + Math.floor(rand(40, 80)));
           const inTunnel = tunnel && i > tunnel.i0 - 20 && i < tunnel.i1 + 20;
           if (!inTunnel) {
-            const lat = rand(-HALF + 2, HALF - 2);
-            const to = new V3(TP[i].x + TS[i].x * lat, TP[i].y, TP[i].z + TS[i].z * lat);
-            const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
-            ring.position.set(to.x, to.y + 0.08, to.z);
-            ring.rotation.x = 0;
-            const mesh = new THREE.Mesh(bombGeo, bombMat);
-            levelGroup.add(ring, mesh);
-            bombs.push({ t: 0, dur: 2.6, from: top.clone(), to, ring, mesh });
+            const lat = r2(rand(-HALF + 2, HALF - 2));
+            dropBomb(i, lat);
+            if (net) netSend({ t: 'bomb', r: net.race, i, lat });
           }
         }
       }
@@ -1997,39 +2121,71 @@ function trackLocate(o, span = 25) {
   o.lat = (o.pos.x - p.x) * s.x + (o.pos.z - p.z) * s.z;
 }
 
-function buildGrid() {
-  for (const k of karts) scene.remove(k.mesh.group);
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+// floating name over other people's karts in online races
+function nameTag(text, color) {
+  const c = makeCanvas(256, 64, (g, w, h) => {
+    g.font = '700 32px "Chakra Petch", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const tw = Math.min(w - 4, g.measureText(text).width + 30);
+    g.fillStyle = 'rgba(27,19,48,0.85)'; g.fillRect((w - tw) / 2, 6, tw, 46);
+    g.fillStyle = hexCss(color); g.fillRect((w - tw) / 2, 46, tw, 6);
+    g.fillStyle = '#FFFFFF'; g.fillText(text, w / 2, 29, w - 16);
+  });
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthWrite: false }));
+  s.scale.set(5.6, 1.4, 1);
+  s.position.y = 3.4;
+  return s;
+}
+
+// spec (online only): one { def, id, name } per grid slot, front row first; id is null for computer rivals
+function buildGrid(spec) {
+  for (const k of karts) {
+    scene.remove(k.mesh.group);
+    if (k.tag) { k.tag.material.map.dispose(); k.tag.material.dispose(); }
+  }
   clearProjectiles();
   clearPools();
   if (levelHooks.reset) levelHooks.reset();
   for (const b of boxes) { b.active = true; b.g.visible = true; }
   karts = [];
   finishCount = 0;
-  const others = ROSTER.map((d, i) => i).filter(i => i !== playerDef);
-  for (let i = others.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [others[i], others[j]] = [others[j], others[i]]; }
-  const order = [...others, playerDef];
+  let entries = spec;
+  if (!entries) {
+    const others = shuffle(ROSTER.map((d, i) => i).filter(i => i !== playerDef));
+    entries = [...others, playerDef].map(di => ({ def: di, id: di === playerDef ? 'me' : null }));
+  }
+  const myId = spec ? net.myId : 'me';
+  const cpuHere = !spec || net.host; // the host drives the computer rivals for everyone
   const skills = [1.0, 0.985, 0.97, 0.955, 0.94];
-  order.forEach((di, slot) => {
-    const def = ROSTER[di];
+  entries.forEach((e, slot) => {
+    const def = ROSTER[e.def];
     const row = Math.floor(slot / 2), col = slot % 2;
     const dist = 7 + row * 7 + col * 3.5;
     const idx = wi(N - Math.round(dist / SEG));
     const lat = col ? 5 : -5;
     const mesh = makeKartMesh(def);
-    const isPlayer = di === playerDef;
+    const isPlayer = e.id === myId, human = e.id !== null;
+    const ctrl = isPlayer ? 'me' : !human && cpuHere ? 'cpu' : 'net';
     const k = {
-      def, name: isPlayer ? 'You' : def.name, mesh, isPlayer,
+      def, name: isPlayer ? 'You' : human ? e.name : def.name, mesh, isPlayer,
+      slot, ctrl, human, net: null, tag: null,
       pos: new V3(TP[idx].x + TS[idx].x * lat, TP[idx].y, TP[idx].z + TS[idx].z * lat),
       h: headingAt(idx), speed: 0, idx, prevIdx: idx, lat,
       prog: (idx - N) / N, lap: 1, rank: slot + 1,
       drift: { active: false, dir: 0, charge: 0, tier: 0 },
       boost: 0, spin: 0, hopT: 0, item: null, pending: null, rolling: 0,
       finished: false, place: 0, time: 0, steerVis: 0, visYaw: 0, pitch: 0, rubber: 1,
-      skill: isPlayer ? 1 : skills[slot] * CLASSES[cls].ai, wallT: 0, wrongT: 0,
+      skill: ctrl === 'cpu' ? skills[Math.min(slot, 4)] * CLASSES[cls].ai : 1, wallT: 0, wrongT: 0,
       ai: { t: rand(0, 10), lane: rand(-5, 5), wf: rand(0.25, 0.5), ph: rand(0, TAU), stuck: 0, itemT: 2 },
     };
     k.mesh.group.position.copy(k.pos);
     k.mesh.group.rotation.y = k.h;
+    if (human && !isPlayer) { k.tag = nameTag(k.name, def.color); k.mesh.group.add(k.tag); }
     karts.push(k);
     if (isPlayer) player = k;
   });
@@ -2132,6 +2288,7 @@ function updateKart(k, inp, dt) {
     k.lap = lapNow;
     if (k.lap > LAPS) {
       k.finished = true; k.place = ++finishCount; k.time = raceTime;
+      if (net) netFinished(k);
       if (k === player) onPlayerFinish();
     } else if (k === player) {
       const lt = raceTime - lapStart; lapStart = raceTime; bestLap = Math.min(bestLap, lt);
@@ -2160,43 +2317,64 @@ function clearProjectiles() {
   for (const p of projs) scene.remove(p.mesh);
   projs.length = 0;
 }
-function spawnBanana(k) {
+let projSeq = 0;
+function projMesh(type) {
   const mesh = new THREE.Group();
-  const b = new THREE.Mesh(bananaGeo, bananaMat);
-  b.rotation.set(Math.PI / 2 - 0.3, 0, 0.6); b.position.y = 0.35;
-  mesh.add(b);
-  const p = { type: 'banana', mesh, pos: new V3(k.pos.x - Math.sin(k.h) * 2.8, k.pos.y, k.pos.z - Math.cos(k.h) * 2.8), idx: k.idx, lat: 0, owner: k, grace: 0.5, life: Infinity };
-  trackLocate(p); p.pos.y = trackY(p);
-  mesh.position.copy(p.pos);
-  scene.add(mesh);
+  if (type === 'banana') {
+    const b = new THREE.Mesh(bananaGeo, bananaMat);
+    b.rotation.set(Math.PI / 2 - 0.3, 0, 0.6); b.position.y = 0.35;
+    mesh.add(b);
+  } else {
+    const dome = new THREE.Mesh(shellDome, shellMats[type]); dome.position.y = 0.35;
+    const rim = new THREE.Mesh(shellRim, rimMat); rim.position.y = 0.35;
+    mesh.add(dome, rim);
+  }
+  return mesh;
+}
+// p needs type, pos, idx, owner; shells also a (heading) and speed. remote: it came from another racer.
+function launch(p, remote) {
+  if (!remote) p.id = p.owner.slot + '-' + (++projSeq);
+  p.mesh = projMesh(p.type);
+  p.lat = 0;
+  if (p.type === 'banana') {
+    Object.assign(p, { grace: 0.5, life: Infinity });
+    trackLocate(p); p.pos.y = trackY(p);
+  } else {
+    Object.assign(p, { grace: 0.35, life: p.type === 'red' ? 8 : 6, bounces: 0 });
+  }
+  p.mesh.position.copy(p.pos);
+  scene.add(p.mesh);
   projs.push(p);
-  const bananas = projs.filter(q => q.type === 'banana');
-  if (bananas.length > 24) removeProj(bananas[0]);
+  if (p.type === 'banana') {
+    const bananas = projs.filter(q => q.type === 'banana');
+    if (bananas.length > 24) removeProj(bananas[0]);
+  }
+  if (net && !remote) netFire(p);
+}
+function spawnBanana(k) {
+  launch({ type: 'banana', pos: new V3(k.pos.x - Math.sin(k.h) * 2.8, k.pos.y, k.pos.z - Math.cos(k.h) * 2.8), idx: k.idx, owner: k });
 }
 function spawnShell(k, type, backwards) {
-  const mesh = new THREE.Group();
-  const dome = new THREE.Mesh(shellDome, shellMats[type]); dome.position.y = 0.35;
-  const rim = new THREE.Mesh(shellRim, rimMat); rim.position.y = 0.35;
-  mesh.add(dome, rim);
   const a = backwards ? k.h + Math.PI : k.h;
   const off = 2.9;
-  const p = {
-    type, mesh, a, speed: Math.max(62, (backwards ? 0 : k.speed) + 26),
-    pos: new V3(k.pos.x + Math.sin(a) * off, k.pos.y, k.pos.z + Math.cos(a) * off), idx: k.idx, lat: 0,
-    owner: k, grace: 0.35, life: type === 'red' ? 8 : 6, bounces: 0, target: null,
-  };
-  if (type === 'red' && !backwards) p.target = karts.find(o => o.rank === k.rank - 1) || null;
-  mesh.position.copy(p.pos);
-  scene.add(mesh);
-  projs.push(p);
+  launch({
+    type, a, speed: Math.max(62, (backwards ? 0 : k.speed) + 26),
+    pos: new V3(k.pos.x + Math.sin(a) * off, k.pos.y, k.pos.z + Math.cos(a) * off), idx: k.idx, owner: k,
+    target: type === 'red' && !backwards ? karts.find(o => o.rank === k.rank - 1) || null : null,
+  });
 }
 function removeProj(p) {
   const i = projs.indexOf(p);
   if (i >= 0) { projs.splice(i, 1); scene.remove(p.mesh); }
 }
-function hitKart(k, by) {
-  if (k.spin > 0) return;
+// only the computer that drives a kart decides that it got hit, then tells everyone else
+function hitKart(k, by, proj) {
+  if (k.spin > 0 || k.ctrl === 'net') return;
   k.spin = SPIN_T; k.boost = 0; k.drift.active = false; k.speed *= 0.35;
+  hitFx(k, by);
+  if (net) netSend({ t: 'hit', r: net.race, v: k.slot, by: by ? by.slot : -1, p: proj ? proj.id : null });
+}
+function hitFx(k, by) {
   for (let i = 0; i < 14; i++) emit(sparks, k.pos.x, k.pos.y + 1.5, k.pos.z, rand(-6, 6), rand(4, 9), rand(-6, 6), i % 2 ? 0xFFD23F : 0xffffff, 0.7, 0.7, 14);
   const dist = player ? k.pos.distanceTo(player.pos) : 0;
   if (dist < 70) sfx.hit();
@@ -2273,7 +2451,7 @@ function updateProjectiles(dt) {
       for (const k of karts) {
         if (k === p.owner && p.grace > 0) continue;
         const dx = k.pos.x - p.pos.x, dz = k.pos.z - p.pos.z;
-        if (dx * dx + dz * dz < 1.8 * 1.8) { hitKart(k, p.owner); p.life = 0; break; }
+        if (dx * dx + dz * dz < 1.8 * 1.8) { hitKart(k, p.owner, p); p.life = 0; break; }
       }
     }
     if (p.life <= 0) removeProj(p);
@@ -2283,19 +2461,22 @@ function updateProjectiles(dt) {
 // ------------------------------------------------------------------ input
 const keys = {};
 let itemQueued = false;
+let netMenu = false; // the race menu is open during an online race (which keeps running)
 const touch = { left: false, right: false, drift: false, brake: false };
 let isTouch = false;
 window.addEventListener('keydown', e => {
+  if (e.target instanceof HTMLInputElement) return; // typing a name or room code
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && state !== 'title') e.preventDefault();
   if (e.repeat) { keys[e.code] = true; return; }
   keys[e.code] = true;
   if ((e.code === 'KeyE' || e.code === 'KeyX') && state === 'race') itemQueued = true;
-  if ((e.code === 'Escape' || e.code === 'KeyP') && (state === 'race' || state === 'countdown')) setPaused(true);
+  if ((e.code === 'Escape' || e.code === 'KeyP') && net) { if (state === 'race' || state === 'countdown') setPaused(!netMenu); }
+  else if ((e.code === 'Escape' || e.code === 'KeyP') && (state === 'race' || state === 'countdown')) setPaused(true);
   else if ((e.code === 'Escape' || e.code === 'KeyP') && state === 'paused') setPaused(false);
   if (e.code === 'KeyR' && state === 'race' && !player.finished) respawn(player);
   if (e.code === 'KeyM') toggleSfx();
   if (e.code === 'KeyN') toggleMusic();
-  if (e.code === 'Enter' && state === 'title' && document.activeElement === document.body) startRace();
+  if (e.code === 'Enter' && state === 'title' && !net && !$('#title').hidden && document.activeElement === document.body) startRace();
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -2350,6 +2531,7 @@ if (matchMedia('(pointer: coarse)').matches) enableTouch();
 window.addEventListener('touchstart', enableTouch, { passive: true, once: true });
 
 function playerInput() {
+  if (netMenu) { itemQueued = false; return { throttle: 0, steer: 0, drift: false, item: false, back: false }; }
   const up = keys.KeyW || keys.ArrowUp;
   const down = keys.KeyS || keys.ArrowDown || touch.brake;
   const left = keys.KeyA || keys.ArrowLeft || touch.left;
@@ -2585,10 +2767,10 @@ function updateKartVisual(k, dt) {
 function updateRanks() {
   const order = karts.slice().sort((a, b) => {
     if (a.finished !== b.finished) return a.finished ? -1 : 1;
-    if (a.finished) return a.place - b.place;
+    if (a.finished) return a.time - b.time; // online, finish times arrive from several computers
     return b.prog - a.prog;
   });
-  order.forEach((k, i) => { k.rank = i + 1; });
+  order.forEach((k, i) => { k.rank = i + 1; if (k.finished) k.place = k.rank; });
   return order;
 }
 
@@ -2597,12 +2779,14 @@ function startRace() {
   initAudio();
   if (AC && AC.state === 'suspended') AC.resume();
   Music.play(levelIdx, false); // ambience during the countdown, the tune starts on GO
-  buildGrid();
+  buildGrid(net ? net.grid : null);
   state = 'countdown';
   countdown = 4.2; lastCount = 5; gasStartCd = null;
   raceTime = 0; lapStart = 0; bestLap = Infinity;
   hudCache = {}; slotKey = '';
+  netMenu = false;
   $('#title').hidden = true; $('#results').hidden = true; $('#pause').hidden = true;
+  $('#online').hidden = true; $('#lobby').hidden = true;
   $('#hud').hidden = false;
   $('#touch').hidden = !isTouch;
   $('#center').textContent = '';
@@ -2612,6 +2796,7 @@ function startRace() {
 }
 
 function onPlayerFinish() {
+  updateRanks();
   const lt = raceTime - lapStart; bestLap = Math.min(bestLap, lt);
   playerFinishAt = animTime;
   sfx.finish();
@@ -2637,7 +2822,7 @@ function showResults() {
   $('#resBest').innerHTML = `Race time <b>${fmt(player.time)}</b> &middot; Best lap <b>${fmt(bestLap)}</b>`;
   const last = levelIdx === LEVELS.length - 1;
   const nextOpen = last || levelIdx + 1 <= unlocked;
-  $('#nextBtn').hidden = !nextOpen;
+  $('#nextBtn').hidden = !nextOpen || !!net;
   $('#nextBtn').textContent = last ? 'Back to track 1' : `Next: ${LEVELS[levelIdx + 1].name}`;
   if (justUnlocked >= 0) {
     $('#resBest').insertAdjacentHTML('beforeend', `<br><span class="unlock">New track unlocked: ${LEVELS[justUnlocked].name}!</span>`);
@@ -2647,16 +2832,22 @@ function showResults() {
     $('#resBest').insertAdjacentHTML('beforeend', `<br><span class="unlock">You've conquered every track!</span>`);
   }
   renderResults();
-  (nextOpen ? $('#nextBtn') : $('#againBtn')).focus({ preventScroll: true });
+  (net ? $('#menuBtn') : nextOpen ? $('#nextBtn') : $('#againBtn')).focus({ preventScroll: true });
   Music.fast = false;
   Music.go();
 }
 function renderResults() {
   const order = updateRanks();
-  $('#resBody').innerHTML = order.map(k => `<tr class="${k === player ? 'me' : ''}"><td class="p">${k.rank}</td><td><i style="background:${hexCss(k.def.color)}"></i>${k === player ? 'You (' + k.def.name + ')' : k.def.name}</td><td class="t ${k.finished ? '' : 'pending'}">${k.finished ? fmt(k.time) : 'Racing…'}</td></tr>`).join('');
+  $('#resBody').innerHTML = order.map(k => `<tr class="${k === player ? 'me' : ''}"><td class="p">${k.rank}</td><td><i style="background:${hexCss(k.def.color)}"></i>${k === player ? 'You (' + k.def.name + ')' : esc(k.name)}</td><td class="t ${k.finished ? '' : 'pending'}">${k.finished ? fmt(k.time) : 'Racing…'}</td></tr>`).join('');
 }
 
 function setPaused(on) {
+  if (net) { // an online race can't stop, so this only opens the race menu
+    netMenu = on && $('#lobby').hidden && $('#results').hidden;
+    $('#pause').hidden = !netMenu;
+    if (netMenu) $('#resumeBtn').focus();
+    return;
+  }
   if (on) { state = 'paused'; $('#pause').hidden = false; $('#resumeBtn').focus(); if (engine) engine.g.gain.value = 0; if (AC) AC.suspend(); }
   else { state = countdown > 0 ? 'countdown' : 'race'; $('#pause').hidden = true; if (AC) AC.resume(); }
 }
@@ -2665,6 +2856,8 @@ function toTitle() {
   state = 'title';
   if (AC && AC.state === 'suspended') AC.resume();
   $('#results').hidden = true; $('#pause').hidden = true; $('#hud').hidden = true; $('#touch').hidden = true;
+  $('#online').hidden = true; $('#lobby').hidden = true;
+  netMenu = false;
   $('#title').hidden = false;
   syncMenu();
   buildGrid();
@@ -2712,7 +2905,7 @@ function step(dt) {
       centerText('GO!', 'go'); sfx.go();
       Music.go();
       if (gasStartCd !== null && gasStartCd <= 1.2) giveBoost(player, 0.9, 'rocket');
-      for (const k of karts) if (k !== player && Math.random() < 0.35) k.boost = 0.7;
+      for (const k of karts) if (k.ctrl === 'cpu' && Math.random() < 0.35) k.boost = 0.7;
     }
     if (engine) {
       engine.o.frequency.value = lerp(engine.o.frequency.value, pin.throttle > 0 ? 150 : 60, 0.1);
@@ -2722,10 +2915,14 @@ function step(dt) {
   } else if (state === 'race') {
     raceTime += dt;
     updateRanks();
+    // computer rivals keep pace with the leading human
+    let lead = player;
+    for (const k of karts) if (k.human && k.prog > lead.prog) lead = k;
     for (const k of karts) {
+      if (k.ctrl === 'net') { netFollow(k, dt); continue; }
       if (k.rolling > 0) { k.rolling -= dt; if (k.rolling <= 0) { k.item = k.pending; k.pending = null; if (k === player) { sfx.got(); $('#slot').classList.remove('flash'); void $('#slot').offsetWidth; $('#slot').classList.add('flash'); } } }
-      if (k !== player) {
-        const gap = player.prog - k.prog;
+      if (k.ctrl === 'cpu') {
+        const gap = lead.prog - k.prog;
         k.rubber = gap > 0 ? 1 + Math.min(gap * 0.6, 0.1) : 1 - Math.min(-gap * 0.35, 0.06);
       }
       const inp = (k === player && !k.finished) ? playerInput() : aiInput(k, dt);
@@ -2751,7 +2948,7 @@ function step(dt) {
         if (dx * dx + dz * dz < 2.2 * 2.2) {
           b.active = false; b.t = 2.5; b.g.visible = false;
           for (let n = 0; n < 12; n++) { const c = new THREE.Color().setHSL(Math.random(), 0.9, 0.6).getHex(); emit(sparks, b.g.position.x, b.g.position.y, b.g.position.z, rand(-5, 5), rand(1, 6), rand(-5, 5), c, 0.5, 0.6, 8); }
-          if (!k.item && k.rolling <= 0 && !k.finished) {
+          if (!k.item && k.rolling <= 0 && !k.finished && k.ctrl !== 'net') {
             k.pending = rollItem(k.rank);
             k.rolling = k === player ? 1.1 : 0.5;
             k.ai.itemT = rand(0.8, 4);
@@ -2764,10 +2961,11 @@ function step(dt) {
     for (const pad of PADS) {
       for (const k of karts) {
         let di = k.idx - pad.i; if (di > N / 2) di -= N; else if (di < -N / 2) di += N;
-        if (Math.abs(di * SEG) < 3.5 && Math.abs(k.lat - pad.lat) < 2.8 && k.boost < 0.6) giveBoost(k, 1.0, 'pad');
+        if (k.ctrl !== 'net' && Math.abs(di * SEG) < 3.5 && Math.abs(k.lat - pad.lat) < 2.8 && k.boost < 0.6) giveBoost(k, 1.0, 'pad');
       }
     }
     updateProjectiles(dt);
+    if (net) netTick(dt);
     if (player.finished) {
       if (!resultsShownAt && animTime - playerFinishAt > 2.2) { resultsShownAt = animTime; showResults(); }
       else if (resultsShownAt && Math.floor(animTime * 3) !== Math.floor((animTime - dt) * 3)) renderResults();
@@ -2859,16 +3057,16 @@ resetBtn.addEventListener('click', () => {
 $('#startBtn').addEventListener('click', startRace);
 $('#resumeBtn').addEventListener('click', () => setPaused(false));
 $('#restartBtn').addEventListener('click', startRace);
-$('#quitBtn').addEventListener('click', toTitle);
+$('#quitBtn').addEventListener('click', () => { if (net) leaveOnline(); else toTitle(); });
 $('#againBtn').addEventListener('click', startRace);
-$('#menuBtn').addEventListener('click', toTitle);
+$('#menuBtn').addEventListener('click', () => { if (net) showLobby(); else toTitle(); });
 $('#nextBtn').addEventListener('click', () => {
   const next = (levelIdx + 1) % LEVELS.length;
   if (next > unlocked) return;
   buildLevel(next); syncMenu(); startRace();
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && (state === 'race' || state === 'countdown')) setPaused(true);
+  if (document.hidden && (state === 'race' || state === 'countdown') && !net) setPaused(true);
   else if (AC && state === 'title') { if (document.hidden) AC.suspend(); else AC.resume(); }
 });
 // browsers only allow sound after a click or key press, so the title music starts on the first one
@@ -2883,10 +3081,499 @@ $('#sfxBtn').addEventListener('click', e => { toggleSfx(); e.currentTarget.blur(
 syncAudioButtons();
 window.addEventListener('keydown', wakeAudio);
 
+// ------------------------------------------------------------------ online: connection layer
+// Moves messages between the host and the guests in a room. Guests only talk to the host, and the
+// host talks to everyone. A WebSocket game server can replace this later: it only has to offer the
+// same methods (host, join, send, sendTo, sendAll, kick, close) and callbacks (onMessage, onLeave,
+// onClose). Nothing outside this section knows about PeerJS.
+const PEER_PREFIX = 'rocketroad-gp-';
+function peerTransport() {
+  let peer = null, beat = 0;
+  const conns = new Map(); // peer id -> data connection
+  const seen = new Map();  // peer id -> when we last heard from it
+  const T = { id: '', isHost: false, onMessage() {}, onLeave() {}, onClose() {} };
+  const drop = c => {
+    if (conns.get(c.peer) !== c) return;
+    conns.delete(c.peer);
+    try { c.close(); } catch (e) { /* already closed */ }
+    if (T.isHost) T.onLeave(c.peer); else T.onClose('Lost the connection to the host.');
+  };
+  const wire = c => {
+    c.on('data', d => { seen.set(c.peer, Date.now()); if (!(d && d.t === '~')) T.onMessage(d, c.peer); });
+    c.on('close', () => drop(c));
+    c.on('error', () => drop(c));
+  };
+  const add = c => { conns.set(c.peer, c); seen.set(c.peer, Date.now()); };
+  // browsers can take a long time to notice a vanished peer, so everyone says "still here" every few seconds
+  const heartbeat = () => {
+    beat = setInterval(() => {
+      for (const c of [...conns.values()]) {
+        put(c, { t: '~' });
+        if (Date.now() - seen.get(c.peer) > 20000) drop(c);
+      }
+    }, 3000);
+  };
+  const open = id => new Promise((resolve, reject) => {
+    if (!window.Peer) { reject({ type: 'no-library' }); return; }
+    peer = id ? new Peer(id, { debug: 0 }) : new Peer({ debug: 0 });
+    const timer = setTimeout(() => reject({ type: 'timeout' }), 12000);
+    peer.on('open', pid => { clearTimeout(timer); T.id = pid; resolve(); });
+    peer.on('error', e => { clearTimeout(timer); reject(e); }); // does nothing once open
+  });
+  const put = (c, msg) => { if (c && c.open) { try { c.send(msg); } catch (e) { /* closing */ } } };
+  T.host = async code => {
+    T.isHost = true;
+    await open(PEER_PREFIX + code);
+    peer.on('connection', c => { wire(c); c.on('open', () => add(c)); });
+    // losing the matchmaking service only stops new guests joining, so try to get it back
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+    heartbeat();
+  };
+  T.join = async code => {
+    await open();
+    await new Promise((resolve, reject) => {
+      const c = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
+      const timer = setTimeout(() => reject({ type: 'timeout' }), 12000);
+      peer.on('error', e => { clearTimeout(timer); reject(e); });
+      c.on('open', () => { clearTimeout(timer); add(c); wire(c); resolve(); });
+    });
+    heartbeat();
+  };
+  T.send = msg => { for (const c of conns.values()) put(c, msg); }; // guest -> host
+  T.sendTo = (id, msg) => put(conns.get(id), msg);
+  T.sendAll = (msg, except) => { for (const [id, c] of conns) if (id !== except) put(c, msg); };
+  T.kick = id => { const c = conns.get(id); if (c) { conns.delete(id); c.close(); } };
+  T.close = () => { clearInterval(beat); conns.clear(); if (peer) { peer.destroy(); peer = null; } };
+  return T;
+}
+
+// ------------------------------------------------------------------ online: rooms and races
+// The host keeps the room: who is in it, the track and the engine class. During a race every
+// computer drives its own kart and sends where it is 20 times a second, and the host also drives
+// the computer rivals and the volcano. Shells and bananas are announced when they're thrown, and
+// a kart's own computer decides when it has been hit.
+const MAX_RACERS = ROSTER.length, NET_HZ = 20;
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O: they look like 1 and 0
+const NAME_KEY = 'rocketroad.name';
+const RELAYED = ['s', 'fire', 'hit', 'fin'];
+const PROJ_TYPES = ['banana', 'green', 'red'];
+const makeCode = () => Array.from({ length: 4 }, () => CODE_CHARS[Math.random() * CODE_CHARS.length | 0]).join('');
+const cleanName = s => String(s || '').replace(/[^\p{L}\p{N} ._-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 12);
+const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+
+function netSend(m) { if (net.host) net.t.sendAll(m); else net.t.send(m); }
+
+function startNet(t, code, name) {
+  net = { t, host: t.isHost, code, myId: t.id, name, players: [], level: levelIdx, cls, race: 0, grid: null, slots: new Map(), sendT: 0, racing: false };
+  t.onMessage = onNetMessage;
+  t.onLeave = id => hostDrop(id, false);
+  t.onClose = leaveOnline;
+  syncOnlineButtons();
+  lobbyNote('');
+  showLobby();
+  if (net.host) { net.players.push({ id: t.id, name, def: playerDef }); broadcastLobby(); }
+  else t.send({ t: 'hello', name, def: playerDef });
+}
+
+function leaveOnline(reason) {
+  if (!net) return;
+  const t = net.t;
+  net = null;
+  t.onMessage = t.onLeave = t.onClose = () => {};
+  if (t.isHost) t.sendAll({ t: 'bye' }); else t.send({ t: 'bye' });
+  setTimeout(() => t.close(), 300); // give the goodbye a moment to go out
+  syncOnlineButtons();
+  if (levelIdx > unlocked) buildLevel(unlocked); // the host's track may still be locked here
+  toTitle();
+  if (typeof reason === 'string') { openOnline(); onlineNote(reason, true); }
+}
+
+function onNetMessage(m, from) {
+  if (!net || !m || typeof m !== 'object') return;
+  if (m.t === 'bye') { if (net.host) hostDrop(from, true); else leaveOnline('The host closed the room.'); return; }
+  if (net.host) {
+    if (m.t === 'hello') { hostAddPlayer(from, m); return; }
+    if (m.t === 'pick') { hostPick(from, m.def); return; }
+    if (!RELAYED.includes(m.t) || m.r !== net.race) return;
+    // guests may only speak for their own kart
+    const slot = net.slots.get(from);
+    if (slot === undefined) return;
+    if (m.t === 's') { if (!Array.isArray(m.k)) return; m.k = m.k.filter(e => Array.isArray(e) && e[0] === slot); }
+    else if ((m.t === 'hit' ? m.v : m.s) !== slot) return;
+    net.t.sendAll(m, from);
+  } else {
+    if (m.t === 'lobby') { applyLobby(m); return; }
+    if (m.t === 'start') { startOnlineRace(m); return; }
+    if (m.t === 'full') { leaveOnline(`That room is full: ${MAX_RACERS} racers is the most.`); return; }
+  }
+  if (m.r !== net.race || (state !== 'race' && state !== 'countdown')) return;
+  if (m.t === 's') applyStates(m.k);
+  else if (m.t === 'fire') onFire(m);
+  else if (m.t === 'hit') onHit(m);
+  else if (m.t === 'fin') onFin(m);
+  else if (m.t === 'bomb' && levelHooks.bomb) levelHooks.bomb(wi(m.i | 0), clamp(+m.lat || 0, -HALF, HALF));
+}
+
+// --- host: the room
+function hostAddPlayer(id, m) {
+  if (net.players.some(p => p.id === id)) return;
+  if (net.players.length >= MAX_RACERS) {
+    const t = net.t;
+    t.sendTo(id, { t: 'full' });
+    setTimeout(() => t.kick(id), 1000);
+    return;
+  }
+  const taken = new Set(net.players.map(p => p.def));
+  const asked = Number.isInteger(m.def) && m.def >= 0 && m.def < ROSTER.length && !taken.has(m.def);
+  const def = asked ? m.def : ROSTER.findIndex((d, i) => !taken.has(i));
+  const name = cleanName(m.name) || 'Racer';
+  net.players.push({ id, name, def });
+  lobbyNote(`${name} joined.`);
+  broadcastLobby();
+}
+function hostPick(id, def) {
+  const p = net.players.find(q => q.id === id);
+  if (!p || !Number.isInteger(def) || def < 0 || def >= ROSTER.length) return;
+  if (net.players.some(q => q !== p && q.def === def)) return;
+  p.def = def;
+  broadcastLobby();
+}
+function hostDrop(id, kick) {
+  if (kick) net.t.kick(id);
+  const i = net.players.findIndex(p => p.id === id);
+  if (i < 0) return;
+  const [p] = net.players.splice(i, 1);
+  const slot = net.slots.get(id);
+  net.slots.delete(id);
+  const k = slot !== undefined && karts[slot];
+  if (k && k.ctrl === 'net' && (state === 'race' || state === 'countdown')) {
+    // a computer rival takes over so the kart doesn't stop dead on the track
+    k.ctrl = 'cpu'; k.human = false; k.net = null; k.rubber = 1;
+    k.skill = 0.97 * CLASSES[cls].ai;
+    toast(`${p.name} left`, '', 1400);
+  }
+  lobbyNote(`${p.name} left.`);
+  broadcastLobby();
+}
+function broadcastLobby() {
+  const racing = (state === 'race' || state === 'countdown') && karts.some(k => k.human && !k.finished);
+  const m = { t: 'lobby', players: net.players, level: net.level, cls: net.cls, racing };
+  net.t.sendAll(m);
+  applyLobby(m);
+}
+function hostStart() {
+  const humans = shuffle(net.players.slice());
+  const used = new Set(humans.map(p => p.def));
+  const cpus = shuffle(ROSTER.map((d, i) => i).filter(i => !used.has(i)));
+  // computer rivals start in front and people at the back, as in a single-player race
+  const grid = [...cpus.map(def => ({ def, id: null, name: '' })), ...humans.map(p => ({ def: p.def, id: p.id, name: p.name }))];
+  net.race++;
+  net.slots = new Map();
+  grid.forEach((e, slot) => { if (e.id && e.id !== net.myId) net.slots.set(e.id, slot); });
+  const m = { t: 'start', r: net.race, level: net.level, cls: net.cls, grid };
+  net.t.sendAll(m);
+  startOnlineRace(m);
+  broadcastLobby();
+}
+
+// --- everyone: the room
+function applyLobby(m) {
+  if (!Array.isArray(m.players)) return;
+  const before = net.players;
+  net.players = m.players.filter(p => p && typeof p.id === 'string')
+    .map(p => ({ id: p.id, name: cleanName(p.name) || 'Racer', def: clamp(p.def | 0, 0, ROSTER.length - 1) }));
+  net.level = clamp(m.level | 0, 0, LEVELS.length - 1);
+  net.cls = CLASSES[m.cls] ? m.cls : '100cc';
+  net.racing = !!m.racing;
+  if (!net.host && before.length) {
+    for (const p of before) if (!net.players.some(q => q.id === p.id)) { lobbyNote(`${p.name} left.`); toast(`${p.name} left`, '', 1400); }
+    for (const p of net.players) if (p.id !== net.myId && !before.some(q => q.id === p.id)) lobbyNote(`${p.name} joined.`);
+  }
+  const me = net.players.find(p => p.id === net.myId);
+  if (me) playerDef = me.def;
+  if (state === 'title') { // show the chosen track and driver behind the lobby
+    if (net.level !== levelIdx) { buildLevel(net.level); buildGrid(); Music.play(levelIdx, true); }
+    else if (me && (!player || player.def !== ROSTER[me.def])) buildGrid();
+  }
+  renderLobby();
+}
+function startOnlineRace(m) {
+  if (!Array.isArray(m.grid) || m.grid.length !== MAX_RACERS) return;
+  const grid = m.grid.map(e => ({
+    def: clamp((e && e.def) | 0, 0, ROSTER.length - 1),
+    id: e && typeof e.id === 'string' ? e.id : null,
+    name: cleanName(e && e.name) || 'Racer',
+  }));
+  if (!grid.some(e => e.id === net.myId)) return;
+  net.race = m.r; net.grid = grid; net.sendT = 0;
+  cls = CLASSES[m.cls] ? m.cls : '100cc';
+  const lv = clamp(m.level | 0, 0, LEVELS.length - 1);
+  if (lv !== levelIdx) buildLevel(lv);
+  startRace();
+}
+
+// --- everyone: the race
+function packKart(k) {
+  const d = k.drift;
+  return [k.slot, r2(k.pos.x), r2(k.pos.z), r2(k.h), r2(k.speed), Math.round(k.prog * 1e4) / 1e4, k.idx,
+    r2(k.steerVis), (d.active ? 1 : 0) | (d.dir > 0 ? 2 : 0), r2(d.charge), r2(Math.max(0, k.boost)), r2(Math.max(0, k.spin))];
+}
+function netTick(dt) {
+  if (state !== 'race') return;
+  net.sendT -= dt;
+  if (net.sendT > 0) return;
+  net.sendT = 1 / NET_HZ;
+  netSend({ t: 's', r: net.race, k: karts.filter(k => k.ctrl !== 'net').map(packKart) });
+}
+function applyStates(list) {
+  if (!Array.isArray(list)) return;
+  const now = performance.now();
+  for (const e of list) {
+    const k = Array.isArray(e) && e.length === 12 && karts[e[0]];
+    if (!k || k.ctrl !== 'net' || !e.every(Number.isFinite)) continue;
+    const drift = !!(e[8] & 1);
+    if (drift && !k.drift.active) k.hopT = 0.28;
+    k.drift.active = drift; k.drift.dir = e[8] & 2 ? 1 : -1; k.drift.charge = e[9];
+    k.boost = e[10]; k.spin = e[11];
+    k.net = { x: e[1], z: e[2], h: e[3], speed: e[4], prog: e[5], idx: wi(e[6] | 0), steer: e[7], at: now, snap: !k.net };
+  }
+}
+// someone else's kart: carry its last update forward by its speed, then glide there
+function netFollow(k, dt) {
+  if (k.boost > 0) k.boost -= dt;
+  if (k.spin > 0) k.spin -= dt;
+  const n = k.net;
+  if (!n) return;
+  const ahead = Math.min((performance.now() - n.at) / 1000, 0.3);
+  const tx = n.x + Math.sin(n.h) * n.speed * ahead, tz = n.z + Math.cos(n.h) * n.speed * ahead;
+  const dx = tx - k.pos.x, dz = tz - k.pos.z;
+  if (n.snap || dx * dx + dz * dz > 20 * 20) { // first update, or put back on the track
+    n.snap = false;
+    k.pos.x = tx; k.pos.z = tz; k.h = n.h; k.idx = n.idx;
+    trackLocate(k, 40);
+  } else {
+    const f = 1 - Math.exp(-12 * dt);
+    k.pos.x += dx * f; k.pos.z += dz * f;
+    k.h = wrapA(k.h + wrapA(n.h - k.h) * f);
+    trackLocate(k);
+  }
+  k.pos.y = trackY(k);
+  k.speed = n.speed;
+  k.prog = n.prog; k.prevIdx = k.idx; k.lap = Math.floor(k.prog) + 1;
+  k.steerVis = lerp(k.steerVis, n.steer, 1 - Math.exp(-12 * dt));
+}
+function netFire(p) {
+  netSend({
+    t: 'fire', r: net.race, s: p.owner.slot, id: p.id, type: p.type, x: r2(p.pos.x), z: r2(p.pos.z),
+    a: r2(p.a || 0), sp: r2(p.speed || 0), tg: p.target ? p.target.slot : -1,
+  });
+}
+function onFire(m) {
+  const k = karts[m.s];
+  if (!k || k.ctrl !== 'net' || !PROJ_TYPES.includes(m.type) || !Number.isFinite(m.x) || !Number.isFinite(m.z)) return;
+  launch({
+    type: m.type, id: String(m.id), pos: new V3(m.x, k.pos.y, m.z), idx: k.idx, owner: k,
+    a: +m.a || 0, speed: +m.sp || 0, target: karts[m.tg] || null,
+  }, true);
+  if (k.pos.distanceTo(player.pos) < 40) sfx.throw();
+}
+function onHit(m) {
+  const k = karts[m.v];
+  if (!k || k.ctrl !== 'net') return;
+  const p = m.p && projs.find(q => q.id === m.p);
+  if (p) removeProj(p);
+  k.spin = SPIN_T; k.boost = 0; k.drift.active = false;
+  hitFx(k, karts[m.by] || null);
+}
+function netFinished(k) {
+  netSend({ t: 'fin', r: net.race, s: k.slot, time: Math.round(k.time * 1000) / 1000 });
+  if (net.host && k.human) broadcastLobby();
+}
+function onFin(m) {
+  const k = karts[m.s];
+  if (!k || k.ctrl !== 'net' || k.finished) return;
+  k.finished = true;
+  k.time = Number.isFinite(m.time) ? m.time : raceTime;
+  finishCount++;
+  if (net.host && k.human) broadcastLobby();
+}
+
+// --- screens
+function onlineNote(text, err) { const el = $('#onlineMsg'); el.textContent = text; el.classList.toggle('err', !!err); }
+function lobbyNote(text, err) { const el = $('#lobbyMsg'); el.textContent = text; el.classList.toggle('err', !!err); }
+function netErrorText(e) {
+  const type = e && e.type;
+  if (type === 'peer-unavailable') return "There's no room with that code. Check it and try again.";
+  if (type === 'timeout') return "Couldn't connect to that room. Check the code and try again.";
+  if (type === 'browser-incompatible') return "This browser can't play online. Try Chrome, Edge, Firefox or Safari.";
+  if (type === 'no-library') return "Online play didn't load. Check your internet connection and reload the page.";
+  return "Couldn't reach the online service. Check your internet connection and try again.";
+}
+function syncOnlineButtons() {
+  $('#restartBtn').hidden = !!net;
+  $('#againBtn').hidden = !!net;
+  $('#quitBtn').textContent = net ? 'Leave room' : 'Main menu';
+  $('#menuBtn').textContent = net ? 'Back to lobby' : 'Main menu';
+  $('#pauseTitle').textContent = net ? 'Race menu' : 'Paused';
+  $('#pauseTip').hidden = !net;
+  $('#resumeBtn').textContent = net ? 'Back to the race' : 'Resume';
+}
+function openOnline() {
+  $('#title').hidden = true;
+  $('#online').hidden = false;
+  if (!$('#nickIn').value) { try { $('#nickIn').value = localStorage.getItem(NAME_KEY) || ''; } catch (e) { /* no saved name */ } }
+  onlineNote('');
+  setOnlineBusy(false);
+  if (!isTouch) ($('#nickIn').value ? ($('#codeIn').value ? $('#joinBtn') : $('#hostBtn')) : $('#nickIn')).focus();
+}
+function setOnlineBusy(on) { for (const id of ['#hostBtn', '#joinBtn', '#onlineBack']) $(id).disabled = on; }
+function readName() {
+  const name = cleanName($('#nickIn').value);
+  $('#nickIn').value = name;
+  if (!name) { onlineNote('Type your name first, so the others know who you are.', true); $('#nickIn').focus(); return null; }
+  try { localStorage.setItem(NAME_KEY, name); } catch (e) { /* the name lasts this visit only */ }
+  return name;
+}
+async function hostRoom() {
+  const name = readName();
+  if (!name) return;
+  initAudio(); goLandscape();
+  setOnlineBusy(true);
+  onlineNote('Opening a room…');
+  let err = { type: 'unavailable-id' };
+  for (let tries = 0; tries < 4 && err.type === 'unavailable-id'; tries++) {
+    const t = peerTransport(), code = makeCode();
+    try { await t.host(code); setOnlineBusy(false); startNet(t, code, name); return; }
+    catch (e) { t.close(); err = e || {}; } // unavailable-id: that code is taken, so try another
+  }
+  setOnlineBusy(false);
+  onlineNote(netErrorText(err), true);
+}
+async function joinRoom() {
+  const name = readName();
+  if (!name) return;
+  const code = cleanCode($('#codeIn').value);
+  if (code.length !== 4) { onlineNote('Room codes are 4 letters.', true); $('#codeIn').focus(); return; }
+  initAudio(); goLandscape();
+  setOnlineBusy(true);
+  onlineNote(`Joining room ${code}…`);
+  const t = peerTransport();
+  try { await t.join(code); setOnlineBusy(false); startNet(t, code, name); }
+  catch (e) { t.close(); setOnlineBusy(false); onlineNote(netErrorText(e), true); }
+}
+function showLobby() {
+  for (const id of ['#title', '#online', '#results', '#pause', '#hud', '#touch']) $(id).hidden = true;
+  netMenu = false;
+  $('#lobby').hidden = false;
+  renderLobby();
+  if (!isTouch) $(net && net.host ? '#lobbyStart' : '#leaveBtn').focus({ preventScroll: true });
+}
+const inviteWeb = location.protocol.startsWith('http');
+const canShare = () => inviteWeb && isTouch && !!navigator.share;
+function renderLobby() {
+  if (!net) return;
+  const me = net.players.find(p => p.id === net.myId);
+  $('#roomCode').textContent = net.code;
+  $('#lobbyCount').textContent = `${net.players.length}/${MAX_RACERS}`;
+  $('#copyBtn').textContent = canShare() ? 'Share invite link' : inviteWeb ? 'Copy invite link' : 'Copy room code';
+  const list = $('#plist');
+  list.textContent = '';
+  const row = (cls, color, text, tag) => {
+    const li = document.createElement('li');
+    li.className = cls;
+    if (color !== null) { const dot = document.createElement('i'); dot.style.background = hexCss(color); li.appendChild(dot); }
+    const s = document.createElement('span'); s.textContent = text; li.appendChild(s);
+    if (tag) { const t = document.createElement('small'); t.textContent = tag; li.appendChild(t); }
+    list.appendChild(li);
+  };
+  net.players.forEach((p, i) => {
+    const mine = p.id === net.myId, host = i === 0; // the host is always first
+    row(mine ? 'me' : '', ROSTER[p.def].color, `${p.name} · ${ROSTER[p.def].name}`, mine ? (host ? 'You · host' : 'You') : host ? 'Host' : '');
+  });
+  const cpu = MAX_RACERS - net.players.length;
+  if (!net.players.length) row('cpu', null, 'Connecting…', '');
+  else if (cpu > 0) row('cpu', null, `+ ${cpu} computer rival${cpu > 1 ? 's' : ''}`, '');
+  $('#lobbyChips').querySelectorAll('.chip').forEach((b, i) => {
+    const owner = net.players.find(p => p.def === i);
+    b.setAttribute('aria-pressed', String(!!me && me.def === i));
+    b.disabled = !me || (!!owner && owner !== me);
+    b.querySelector('small').textContent = owner && owner !== me ? owner.name : ROSTER[i].tag;
+  });
+  $('#hostOpts').hidden = !net.host;
+  $('#guestOpts').hidden = net.host;
+  $('#lobbyStart').hidden = !net.host;
+  if (net.host) {
+    $('#lobbyTracks').querySelectorAll('.trk').forEach((b, i) => {
+      const locked = i > unlocked;
+      b.setAttribute('aria-pressed', String(i === net.level));
+      b.disabled = locked;
+      b.querySelector('small').textContent = locked ? 'Locked' : LEVELS[i].tag;
+      b.querySelector('.band').innerHTML = locked ? '<span class="lock">LOCKED</span>' : '';
+    });
+    $('#lobbyClass').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === net.cls)));
+  } else {
+    $('#lobbyRace').textContent = `${LEVELS[net.level].name} · ${net.cls}`;
+    $('#lobbyWait').textContent = !me ? 'Joining…'
+      : net.racing && state === 'title' ? "A race is under way. You'll be on the grid for the next one."
+      : 'Waiting for the host to start the race.';
+  }
+}
+
+ROSTER.forEach((d, i) => {
+  const b = document.createElement('button');
+  b.className = 'chip';
+  b.innerHTML = `<i style="background:${hexCss(d.color)}"></i><span>${d.name}<small>${d.tag}</small></span>`;
+  b.addEventListener('click', () => {
+    if (!net) return;
+    if (net.host) hostPick(net.myId, i); else net.t.send({ t: 'pick', def: i });
+  });
+  $('#lobbyChips').appendChild(b);
+});
+LEVELS.forEach((lv, i) => {
+  const b = document.createElement('button');
+  b.className = 'trk';
+  b.innerHTML = `<span class="band" style="background:${lv.band}"></span><span class="tn">Track ${i + 1}</span><b>${lv.name}</b><small></small>`;
+  b.addEventListener('click', () => { if (net && net.host && i <= unlocked) { net.level = i; broadcastLobby(); } });
+  $('#lobbyTracks').appendChild(b);
+});
+$('#lobbyClass').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  if (net && net.host) { net.cls = b.dataset.c; broadcastLobby(); }
+}));
+$('#onlineBtn').addEventListener('click', openOnline);
+$('#onlineBack').addEventListener('click', () => { $('#online').hidden = true; $('#title').hidden = false; });
+$('#hostBtn').addEventListener('click', hostRoom);
+$('#joinBtn').addEventListener('click', joinRoom);
+$('#codeIn').addEventListener('input', e => { const v = cleanCode(e.target.value); if (v !== e.target.value) e.target.value = v; });
+$('#codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+$('#nickIn').addEventListener('keydown', e => { if (e.key === 'Enter' && $('#codeIn').value) joinRoom(); });
+$('#lobbyStart').addEventListener('click', () => { if (net && net.host) hostStart(); });
+$('#leaveBtn').addEventListener('click', () => leaveOnline());
+$('#copyBtn').addEventListener('click', async () => {
+  if (!net) return;
+  const link = `${location.origin}${location.pathname}?room=${net.code}`;
+  try {
+    if (canShare()) { await navigator.share({ title: 'Rocket Road GP', text: `Race me in Rocket Road GP! Room code ${net.code}`, url: link }); return; }
+    await navigator.clipboard.writeText(inviteWeb ? link : net.code);
+    lobbyNote(inviteWeb ? 'Invite link copied. Send it to your friends.' : 'Room code copied.');
+  } catch (e) {
+    if (e && e.name === 'AbortError') return; // closed the share sheet
+    lobbyNote(`Couldn't copy. Tell your friends the code: ${net.code}`);
+  }
+});
+window.addEventListener('pagehide', () => {
+  if (!net) return;
+  netSend({ t: 'bye' });
+  net.t.close();
+});
+
 buildLevel(0);
 syncMenu();
 buildGrid();
 requestAnimationFrame(frame);
+
+// an invite link (?room=CODE) opens straight onto the join screen
+const invite = cleanCode(new URLSearchParams(location.search).get('room'));
+if (invite) { $('#codeIn').value = invite; openOnline(); }
 })();
 </script>
 </body>
