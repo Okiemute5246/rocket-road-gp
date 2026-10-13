@@ -20,10 +20,11 @@ A 3D kart racer that runs in the browser. Race five computer rivals over three l
 | 2 | Garden City Grand Prix | Port Harcourt: a tree-lined boulevard, a narrow bridge over a creek, then an industrial waterfront and a riverside run to the finish. The waterfront roads are wet and slippery (karts slide wide), puddles splash you, steam drifts across the road and slow tanker trucks do laps. A riverside service road is a shortcut, but it's narrow and wet all the way |
 | 3 | Delta Creek Run | Warri: a riverside settlement, a raised causeway and a long bridge over the creek, tight bends through a riverside neighbourhood (with mud that bogs you down), then a bumpy plank jetty to the finish. Boats run up and down the channels and debris drifts on the water. A narrow plank boardwalk is a shortcut, with a jump over a broken section: hit the ramp fast or you drop into the water and start again on the boardwalk |
 | 4 | Zuma Rock Circuit | Abuja: a modern boulevard out of the city, then a climb past Zuma Rock through two tight hairpins, a tunnel through a rock outcrop and a fast run back down. Climbs slow you and descents let you run past your top speed. Rocks fall in two marked stretches (a red ring shows where), and loose gravel cuts your grip. A narrow, rough mountain pass cuts across the second hairpin |
-| 5 | Pepper Hill | Rolling green hills |
-| 6 | Cloud Nine Skyway | A floating road above the clouds |
-| 7 | Coral Causeway | A bridge over the sea |
-| 8 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
+| 5 | Bronze Kingdom | Benin City: a monumental gate, a ceremonial avenue of bronze sculptures, a courtyard district of tight corners between patterned walls, three timed gateways, and a plaza of turning bronze arms and sliding floor plates. Each gateway has two leaves that rise from the road in turn, so one half is always open: lamps go green, then flash amber before a leaf rises, then red. A narrow passage between courtyards cuts the last corner, with a tight exit just before the first gateway |
+| 6 | Pepper Hill | Rolling green hills |
+| 7 | Cloud Nine Skyway | A floating road above the clouds |
+| 8 | Coral Causeway | A bridge over the sea |
+| 9 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
 
 Finish a track in the top 3 to unlock the next one. Progress is saved in your browser, and **Reset progress** on the title screen locks the tracks again.
 

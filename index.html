@@ -2527,6 +2527,224 @@ function decoZuma(E) {
   };
 }
 
+// a wall pattern in the Benin style: deep red with gold and cream bands of zigzags and rings
+const motifWall = () => makeCanvas(256, 128, (g, w, h) => {
+  g.fillStyle = '#8B1E1E'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#6E1616'; for (let y = 0; y < h; y += 8) g.fillRect(0, y, w, 1);
+  g.fillStyle = '#D4A017'; g.fillRect(0, 34, w, 4); g.fillRect(0, 62, w, 4);
+  g.strokeStyle = '#F3E5C0'; g.lineWidth = 3; g.beginPath();
+  for (let x = 0; x <= w; x += 16) g.lineTo(x, x % 32 ? 40 : 60);
+  g.stroke();
+  g.strokeStyle = '#D4A017'; g.lineWidth = 2;
+  for (let x = 12; x < w; x += 24) { g.beginPath(); g.arc(x, 92, 7, 0, TAU); g.stroke(); g.beginPath(); g.arc(x, 92, 2.5, 0, TAU); g.stroke(); }
+});
+// a stylised bronze bust on a plinth (an abstract sculpture, not a copy of any real work)
+function makeBust(mats) {
+  const g = new THREE.Group();
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.4, 2.6), mats.cream); plinth.position.y = 1.2;
+  g.add(plinth);
+  for (let k = 0; k < 5; k++) { const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.85 - k * 0.04, 0.9 - k * 0.04, 0.32, 14), mats.bronze); ring.position.y = 2.6 + k * 0.32; g.add(ring); }
+  const head = new THREE.Mesh(new THREE.SphereGeometry(1.05, 14, 10), mats.bronze); head.scale.set(0.95, 1.15, 1); head.position.y = 5.1;
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.05, 1.5, 14), mats.bronze); crown.position.y = 6.4;
+  const beads = new THREE.Mesh(new THREE.TorusGeometry(1.02, 0.12, 6, 18).rotateX(Math.PI / 2), mats.gold); beads.position.y = 6.0;
+  const beads2 = beads.clone(); beads2.position.y = 6.8;
+  const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.1), mats.dark); eyes.position.set(0, 5.25, 0.98);
+  g.add(head, crown, beads, beads2, eyes);
+  return g;
+}
+
+function decoBronze(E) {
+  const sc = L.scale;
+  const at = (x, z) => nearestOn(MAIN, x * sc, z * sc, 0, N - 1).i;
+  const inRange = (j, a, b) => wi(j - a) <= wi(b - a);
+  const mats = {
+    bronze: new THREE.MeshPhongMaterial({ color: 0xB0703A, specular: 0xffd9a0, shininess: 55 }),
+    gold: new THREE.MeshPhongMaterial({ color: 0xD4A017, specular: 0xfff0b0, shininess: 70 }),
+    cream: lambert({ color: 0xF3E5C0 }), red: lambert({ color: 0x8B1E1E }), dark: lambert({ color: 0x2a1a12 }),
+    green: lambert({ color: 0x1E7A3A }), wood: lambert({ map: canvasTex(PAINT.planks(), 1, 1) }),
+  };
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), lambert({ map: canvasTex(PAINT.gravel('#3f8a3f', ['#347a34', '#4c9a48', '#2f6e30']), 220, 220) }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(E.cx, -0.08, E.cz);
+  levelGroup.add(ground);
+
+  // tall patterned courtyard walls lining the courtyard district (and the side passage)
+  const cz0 = at(200, -10), cz1 = at(85, -236);
+  const wallTex = lambert({ map: canvasTex(motifWall(), 1, 1), side: THREE.DoubleSide });
+  const court = j => inRange(j, cz0, cz1) && !MAIN.hideL[j] && !MAIN.hideR[j];
+  ribbon(j => -wallL[j] - 1.6, j => -wallL[j] - 1.6, 0, j => court(j) ? 6.5 : 0, 8, wallTex);
+  ribbon(j => wallR[j] + 1.6, j => wallR[j] + 1.6, 0, j => court(j) ? 6.5 : 0, 8, wallTex);
+  for (const B of BRANCHES) for (const s of [-1, 1]) {
+    ribbon(j => s * (B.wR[j] + 1.4), j => s * (B.wR[j] + 1.4), 0, j => (s > 0 ? B.hideR : B.hideL)[j] ? 0 : 6.5, 8, wallTex, levelGroup, B);
+  }
+  // carved wooden doors set into the courtyard walls
+  for (let j = cz0; inRange(j, cz0, cz1); j = wi(j + Math.round(36 / SEG))) for (const s of [-1, 1]) {
+    if (MAIN.hideL[j] || MAIN.hideR[j]) continue;
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 4.6), mats.wood);
+    placeOnTrack(door, j, s * ((s > 0 ? wallR[j] : wallL[j]) + 1.5), 2.3);
+    door.rotation.y += s > 0 ? -Math.PI / 2 : Math.PI / 2;
+    levelGroup.add(door);
+  }
+
+  // the monumental gate just past the start line
+  const gate = new THREE.Group(), gi = wi(Math.round(30 / SEG)), span = wallL[gi] + wallR[gi];
+  const towerMat = lambert({ map: canvasTex(motifWall(), 1, 2) });
+  for (const s of [-1, 1]) {
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(9, 24, 10), towerMat); tower.position.set(s * (span / 2 + 4.5), 12, 0);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(10, 1.2, 11), mats.gold); cap.position.set(s * (span / 2 + 4.5), 24.6, 0);
+    gate.add(tower, cap);
+    for (let k = 0; k < 4; k++) { const merlon = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2, 10), mats.red); merlon.position.set(s * (span / 2 + 4.5) - 3.6 + k * 2.4, 26, 0); gate.add(merlon); }
+    const bust = makeBust(mats); bust.scale.setScalar(1.8); bust.position.set(s * (span / 2 + 14), 0, -4); gate.add(bust);
+  }
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(span + 4, 6, 10), towerMat); lintel.position.y = 19;
+  const band = new THREE.Mesh(new THREE.BoxGeometry(span + 4.2, 1, 10.2), mats.gold); band.position.y = 16.3;
+  gate.add(lintel, band);
+  for (let k = 0; k < 9; k++) { const merlon = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2, 10), mats.red); merlon.position.set(-span / 2 + 1 + k * span / 8.5, 23, 0); gate.add(merlon); }
+  placeOnTrack(gate, gi, (wallR[gi] - wallL[gi]) / 2);
+  levelGroup.add(gate);
+
+  // the ceremonial avenue: bronze busts on plinths and red-and-gold banners
+  const bannerMat = lambert({ map: canvasTex(makeCanvas(32, 128, (g, w, h) => {
+    g.fillStyle = '#8B1E1E'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#D4A017'; g.fillRect(0, 0, w, 6); g.fillRect(0, h - 6, w, 6);
+    g.beginPath(); g.arc(w / 2, h / 2, 9, 0, TAU); g.fill();
+    g.fillStyle = '#8B1E1E'; g.beginPath(); g.arc(w / 2, h / 2, 5, 0, TAU); g.fill();
+  })), side: THREE.DoubleSide });
+  roadside(E, MAIN, 34, 4, 0, at(-130, -10), at(170, 0)).forEach(([x, z, , h, side], n) => {
+    if (n % 2) {
+      const b = makeBust(mats); b.position.set(x, 0, z); b.rotation.y = h + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      levelGroup.add(b);
+    } else {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 9, 6), mats.gold); pole.position.set(x, 4.5, z);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 5), bannerMat); flag.position.set(x, 6, z); flag.rotation.y = h;
+      levelGroup.add(pole, flag);
+    }
+  });
+  addPalms(roadside(E, MAIN, 30, 9, 4, at(-130, -10), at(170, 0)).map(s => [s[0], s[1]]));
+
+  // landscaped courtyards and the town beyond: lawns with palms and hedges, red-roofed houses
+  const yards = E.spots(70, WALL + 10, 40);
+  addPalms(yards.slice(0, 30).map(([x, z]) => [x, z]));
+  addTrees(yards.slice(30), { roundP: 1, hue: [0.28, 0.36], lig: [0.2, 0.3], scale: [0.6, 1.0] });
+  const houses = E.spots(90, WALL + 26, 260);
+  const hb = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), lambert({ map: canvasTex(PAINT.windows(1, false)) }), Math.max(1, houses.length));
+  const hr = new THREE.InstancedMesh(new THREE.ConeGeometry(0.75, 0.45, 4).rotateY(Math.PI / 4).translate(0, 0.22, 0), lambert({ color: 0x9a3a22, flatShading: true }), Math.max(1, houses.length));
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new V3(0, 1, 0), col = new THREE.Color();
+  houses.forEach(([x, z], n) => {
+    const w = rand(9, 14), d = rand(8, 12), ht = rand(4, 6), a = rand(0, TAU);
+    q.setFromAxisAngle(up, a);
+    hb.setMatrixAt(n, m.compose(new V3(x, 0, z), q, new V3(d, ht, w))); hb.setColorAt(n, col.setHex([0xC9774A, 0xE3B98A, 0xF3E5C0, 0xB5653A][n % 4]));
+    hr.setMatrixAt(n, m.compose(new V3(x, ht, z), q, new V3(d * 1.4, 5, w * 1.4)));
+  });
+  levelGroup.add(hb, hr);
+
+  // ---- timed gates: three decorative gateways, each with two bronze leaves that rise from the road.
+  // One half is always open; the leaves swap every 3.5 s. Lamps: green open, flashing amber for the
+  // 1.5 s before a leaf rises, red while it's up. A leaf only blocks once it's more than half up.
+  const T = 7;
+  const leafH = (local) => local < 0.5 ? local / 0.5 : local < 3.5 ? 1 : local < 4 ? 1 - (local - 3.5) / 0.5 : 0;
+  const leafPanel = lambert({ map: canvasTex(makeCanvas(128, 64, (g, w, h) => {
+    g.fillStyle = '#9A5E2E'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#D4A017'; g.lineWidth = 3; g.strokeRect(4, 4, w - 8, h - 8);
+    for (let x = 20; x < w; x += 22) { g.beginPath(); g.arc(x, h / 2, 7, 0, TAU); g.stroke(); }
+  })) });
+  const gates = [[20, -238, 0], [-35, -238, 2.3], [-90, -237, 4.6]].map(([x, z, phase]) => {
+    const i = at(x, z), arch = new THREE.Group();
+    const w = wallL[i] + wallR[i];
+    for (const s of [-1, 1]) {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(2.4, 12, 2.4), towerMat); pillar.position.set(s * (w / 2 + 1.2), 6, 0);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), mats.gold); knob.position.set(s * (w / 2 + 1.2), 12.8, 0);
+      arch.add(pillar, knob);
+    }
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(w + 4.8, 2.4, 2.4), towerMat); beam.position.y = 11;
+    const crest = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.4, 6, 20), mats.gold); crest.position.y = 14.6;
+    arch.add(beam, crest);
+    placeOnTrack(arch, i, (wallR[i] - wallL[i]) / 2);
+    levelGroup.add(arch);
+    const leaves = [-1, 1].map(s => {
+      const g = new THREE.Group();
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(HALF - 0.3, 3, 1.2), leafPanel); panel.position.y = 1.5;
+      const lampMat = new THREE.MeshBasicMaterial({ color: 0x2EC27E });
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), lampMat);
+      g.add(panel);
+      const post = new THREE.Group(); post.add(lamp); lamp.position.set(0, 8.5, -1.5); // on the pillar, facing oncoming karts
+      placeOnTrack(post, i, s * (w / 2 + 1.2)); levelGroup.add(post);
+      levelGroup.add(g);
+      const half = (s > 0 ? wallR[i] : wallL[i]); // each leaf spans its half of the road, kerb to barrier
+      const o = addObstacle({ i, lat: s * half / 2, len: 1.6, w: half, kind: 'barrier', mesh: g, side: s, lampMat });
+      panel.scale.x = half / (HALF - 0.3);
+      o.height = t => leafH(((t + phase + (s > 0 ? T / 2 : 0)) % T + T) % T);
+      o.heightAt = secs => o.height(gateClock() + secs);
+      o.solidAt = secs => o.heightAt(secs) > 0.5;
+      return o;
+    });
+    leaves[0].pair = leaves[1]; leaves[1].pair = leaves[0];
+    return { i, leaves };
+  });
+  const gateClock = () => state === 'race' ? raceTime : state === 'countdown' ? 0 : animTime;
+
+  // ---- the plaza: turning bronze arms on pillars, then floor plates that slide side to side
+  const arms = [];
+  [[-208, -175, 0], [-209, -150, 1.4]].forEach(([x, z, phase]) => {
+    const i = at(x, z);
+    for (const s of [-1, 1]) {
+      const lat = s * 8.5;
+      const pivot = new THREE.Group();
+      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1, 3.2, 12), mats.red); pillar.position.y = 1.6;
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.4, 16), mats.gold); disc.position.y = 3.3;
+      pivot.add(pillar, disc);
+      placeOnTrack(pivot, i, lat); levelGroup.add(pivot);
+      addObstacle({ i, lat, len: 1.8, w: 1.8, kind: 'barrier' }); // the pillar
+      const bar = new THREE.Group();
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 10), mats.bronze); beam.position.y = 1.4;
+      const ends = [-1, 1].map(e => { const b = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), mats.gold); b.position.set(0, 1.4, e * 5); return b; });
+      bar.add(beam, ...ends);
+      levelGroup.add(bar);
+      const o = addObstacle({ i, lat, len: 10, w: 1, kind: 'barrier', mesh: bar, rot: 0, aiW: 11 });
+      arms.push({ o, phase, spin: s * 1.5, base: headingAt(i) });
+    }
+  });
+  const plates = [[-205, -122, 0], [-203, -108, 2.1], [-200, -94, 4.2]].map(([x, z, phase]) => {
+    const i = at(x, z);
+    const mesh = new THREE.Group();
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 9), new THREE.MeshPhongMaterial({ map: canvasTex(makeCanvas(64, 64, (g, w, h) => {
+      g.fillStyle = '#B0703A'; g.fillRect(0, 0, w, h);
+      g.strokeStyle = '#D4A017'; g.lineWidth = 3; g.strokeRect(3, 3, w - 6, h - 6);
+      g.beginPath(); g.arc(w / 2, h / 2, 14, 0, TAU); g.stroke(); g.beginPath(); g.moveTo(w / 2, 6); g.lineTo(w / 2, h - 6); g.moveTo(6, h / 2); g.lineTo(w - 6, h / 2); g.stroke();
+    })), specular: 0xffd9a0, shininess: 50 }));
+    plate.position.y = 0.12;
+    const slot = new THREE.Mesh(new THREE.PlaneGeometry(HALF * 2 - 2, 9.4).rotateX(-Math.PI / 2), mats.dark); // the groove it slides in
+    slot.position.y = 0.03;
+    placeOnTrack(slot, i, 0, 0, true);
+    mesh.add(plate);
+    levelGroup.add(mesh, slot);
+    return { o: addObstacle({ i, lat: 0, len: 9, w: 8, kind: 'slide', mesh, vlat: 0 }), phase };
+  });
+
+  addClouds(E, 12);
+
+  return {
+    moving: [...gates.flatMap(g => g.leaves.map(o => o.mesh)), ...arms.map(a => a.o.mesh), ...plates.map(p => p.o.mesh)],
+    update(dt, t) {
+      const tt = gateClock();
+      for (const g of gates) for (const o of g.leaves) {
+        const h = o.height(tt);
+        o.on = h > 0.5;
+        o.mesh.position.y = TP[g.i].y - 3 + h * 3; // rises out of the road
+        const warn = !o.on && o.height(tt + 1.5) > 0.5;
+        o.lampMat.color.setHex(o.on ? 0xE8363C : warn ? (Math.sin(t * 14) > 0 ? 0xFFB020 : 0x5a3a10) : 0x2EC27E);
+        if (warn && player && player.path === MAIN && Math.abs(wi(player.idx - g.i + 40)) < 45 && Math.random() < 0.02) tone(220, 0.08, 'square', 0.03);
+      }
+      for (const a of arms) { a.o.rot = a.base + tt * a.spin + a.phase; placeObstacle(a.o); }
+      for (const p of plates) {
+        const w = 1.2, amp = 5.5;
+        p.o.lat = Math.sin(tt * w + p.phase) * amp;
+        p.o.vlat = Math.cos(tt * w + p.phase) * amp * w;
+        placeObstacle(p.o);
+      }
+    },
+  };
+}
+
 const LEVELS = [
   {
     name: 'Danfo Dash', tag: 'Lagos · City circuit', band: 'linear-gradient(180deg,#FFC21F 0 50%,#4e5159 50%)',
@@ -2597,6 +2815,23 @@ const LEVELS = [
     arch: { post: 0x0f6b3a, bg: '#0f6b3a', text: '#FFFFFF', stripe: '#E8363C' },
     shoulder: () => PAINT.gravel('#9c5a3c', ['#8a4e34', '#ab6a4a', '#7d462e']), base: 'ground', deco: decoZuma, dust: 0xa0522d, theme: 7,
     pads: [[0.06, 0], [0.3, 0], [0.82, 0], [0.92, 0]], boxes: [0.15, 0.48, 0.75],
+  },
+  {
+    name: 'Bronze Kingdom', tag: 'Benin City · Historic circuit', band: 'linear-gradient(180deg,#8B1E1E 0 40%,#D4A017 40% 55%,#B0703A 55%)',
+    scale: 1.5, groundY: 0,
+    cp: [[-80, 0, 0], [40, 0, 0], [160, 0, 0], [200, -10, 0], [215, -45, 0], [215, -100, 0], [205, -125, 0], [170, -135, 0],
+      [120, -135, 0], [100, -145, 0], [95, -175, 0], [95, -215, 0], [80, -235, 0], [20, -238, 0], [-60, -238, 0],
+      [-140, -235, 0], [-185, -215, 0], [-210, -170, 0], [-205, -110, 0], [-180, -55, 0], [-140, -15, 0]],
+    // a narrow passage between the courtyards that skips a corner, with a tight exit
+    branches: [{ from: [95, -178], to: [48, -238], cp: [[82, -196], [70, -212], [60, -226]], half: 4, ai: 0.4 }],
+    branchLook: { road: ['#6a5a50', 'rgba(243,229,192,0.6)', 'rgba(0,0,0,0)'], wall: ['#F3E5C0', '#D4A017', '#8B1E1E'], shoulder: () => PAINT.pavement('#E9DCC0', '#C9B48A') },
+    // courtyard walls hard against the road, and the gateways spanning it kerb to kerb
+    narrow: [{ from: [203, -12], to: [86, -232], wall: 13.5 }, { from: [35, -238], to: [-105, -237], wall: 12.6 }],
+    sky: [0x5aa2e0, 0xf3e8d2], fog: [260, 900], hemi: [0xfff4e0, 0x5a4a2a, 0.95], sun: [0xffe4b8, 0.75],
+    road: ['#5a4a44', '#F3E5C0', 'rgba(212,160,23,0.7)'], curb: ['#D4A017', '#8B1E1E'], wall: ['#8B1E1E', '#A52A2A', '#D4A017'],
+    arch: { post: 0x8B1E1E, bg: '#8B1E1E', text: '#D4A017', stripe: '#F3E5C0' },
+    shoulder: () => PAINT.pavement('#E9DCC0', '#C9B48A'), base: 'ground', deco: decoBronze, dust: 0xC9B48A, theme: 8,
+    pads: [[0.08, 0], [0.32, 0], [0.72, 0], [0.95, 0]], boxes: [0.18, 0.55, 0.9],
   },
   {
     name: 'Pepper Hill', tag: 'Rolling green hills', band: 'linear-gradient(180deg,#8FD3F5 0 55%,#62B84A 55%)',
@@ -3316,6 +3551,15 @@ const THEMES = [
     drums: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'x.xxx.xxx.xxx.xx', tom: '............h.m.', fill: '....x.......xxxx' },
     amb: 'hills',
   },
+  { // 8 Bronze Kingdom: stately and proud, bronze bells over talking drums and a bell pattern
+    bpm: 118, scale: 'major', leadBase: 72, bassBase: 43, arpBase: 60, chords: [0, 3, 4, 0, 5, 3, 4, 4],
+    lead: ['0...2.4.5...4...', '3...5.7.8...7...', '4...7.6.4...2...', '0.2.4.2.0-------',
+      '7...9.7.5...4...', '5...7.5.3...2...', '4.5.7.5.4.2.1.2.', '4-------0-------'],
+    leadVoice: 'bell', leadVol: 0.07, bass: 'R...R.5.R...R.O.', bassVoice: 'sineBass', bassVol: 0.16,
+    arp: '0.2.4.2.0.2.4.2.', arpVoice: 'marimba', arpVol: 0.05,
+    drums: { kick: 'x.....x.x.......', tom: 'h..m..l.h.m.l...', bell: 'x.x.x..x.x.x..x.', shaker: '..x...x...x...x.' },
+    amb: 'courtyard',
+  },
 ];
 
 function playStep(th, s, t, sd) {
@@ -3394,6 +3638,16 @@ function startAmbience(kind) {
     tick = t => {
       if (Math.random() < 0.08) noiseHit(t, 'highpass', 3000, rand(0.015, 0.045), 0.02, ambBus);
       if (Math.random() < 0.004) noiseHit(t, 'lowpass', 90, 0.45, 1.8, ambBus, brownBuf);
+    };
+  } else if (kind === 'courtyard') {
+    // a breeze through the courtyards, birds, wind chimes, and drums somewhere across the city
+    const f = filt('bandpass', 600, 0.6), g = gain(0.03);
+    loop(noiseBuf).connect(f); f.connect(g); g.connect(ambBus);
+    lfo(0.1, 0.015, g.gain);
+    tick = t => {
+      if (Math.random() < 0.008) { const base = rand(2400, 3600); for (let k = 0; k < 2; k++) blip(t + k * 0.12, 'sine', base, base * 1.3, 0.07, 0.025); }
+      if (Math.random() < 0.004) for (let k = 0; k < 3; k++) { const f0 = [1568, 1760, 2093, 2349][Math.random() * 4 | 0]; blip(t + k * 0.18, 'sine', f0, f0, 1.2, 0.012); }
+      if (Math.random() < 0.003) for (let k = 0; k < 4; k++) blip(t + k * 0.2, 'sine', 130 - k * 8, 70, 0.25, 0.05);
     };
   } else if (kind === 'hills') {
     // wind over open hills, birds, and a hawk's cry from up near the rock
@@ -3688,11 +3942,15 @@ function giveBoost(k, t, kind) {
 // ---------- obstacles
 // Each one is a box lying along its road: { path, i (sample, may be fractional for moving ones), lat,
 // len, w, kind, solid, speed, mesh }. kind 'parked' and 'barrier' block, 'traffic' blocks and spins
-// racers out, 'hole' (a pothole) just jolts and slows them. Moving traffic sets i from the race clock,
-// so every computer in an online race sees the same traffic without sending anything.
+// racers out, 'hole' (a pothole) just jolts and slows them; 'puddle' and 'mud' are patches; 'slide'
+// is a floor plate that carries karts sideways (vlat). Optional: rot (a fixed heading instead of the
+// road's, for things that turn), on (false: a gate leaf that's down, so not blocking), solidAt(secs)
+// (whether it will block that many seconds from now, for the computer drivers), aiW (the width they
+// should steer round). Anything that moves sets its state from the race clock, so every computer in
+// an online race sees the same thing without sending anything.
 function addObstacle(o) {
-  o = Object.assign({ path: MAIN, len: 4, w: 2.4, kind: 'parked', speed: 0, y: 0 }, o);
-  o.solid = !['hole', 'puddle', 'mud'].includes(o.kind);
+  o = Object.assign({ path: MAIN, len: 4, w: 2.4, kind: 'parked', speed: 0, y: 0, on: true }, o);
+  o.solid = !['hole', 'puddle', 'mud', 'slide'].includes(o.kind);
   o.x = 0; o.z = 0; o.fx = 0; o.fz = 1;
   placeObstacle(o);
   OBST.push(o);
@@ -3707,6 +3965,7 @@ function placeObstacle(o) {
   const sx = lerp(sa.x, sb.x, f), sz = lerp(sa.z, sb.z, f), sl = Math.hypot(sx, sz) || 1;
   o.x = px + sx / sl * o.lat; o.z = pz + sz / sl * o.lat;
   o.fx = sz / sl; o.fz = -sx / sl; // forward is the side vector turned back a quarter
+  if (o.rot !== undefined) { o.fx = Math.sin(o.rot); o.fz = Math.cos(o.rot); }
   if (o.mesh) {
     o.mesh.position.set(o.x, py + o.y, o.z);
     o.mesh.rotation.order = 'YXZ';
@@ -3724,8 +3983,14 @@ function obstacleOverlap(o, pos, r) {
 function collideObstacles(k, dt) {
   k.holeT -= dt;
   for (const o of OBST) {
-    const hit = obstacleOverlap(o, k.pos, 1.15);
+    if (!o.on) continue;
+    const hit = obstacleOverlap(o, k.pos, o.kind === 'slide' ? 0 : 1.15);
     if (!hit) continue;
+    if (o.kind === 'slide') { // riding a moving floor plate: carried sideways with it
+      const s = o.path.S[Math.round(o.i)];
+      k.pos.x += s.x * o.vlat * dt; k.pos.z += s.z * o.vlat * dt;
+      continue;
+    }
     const [ax, lx, pa, pl] = hit;
     if (o.kind === 'puddle') {
       if (k.slickT <= -0.5 && Math.abs(k.speed) > 8) {
@@ -3775,7 +4040,12 @@ function obstaclesAhead(k, ahead) {
     if (o.path !== k.path) continue;
     let d = o.i - k.idx;
     if (k.path.loop) { if (d > N / 2) d -= N; else if (d < -N / 2) d += N; }
-    if (d > -4 && d < ahead) out.push(o);
+    if (d <= -4 || d >= ahead) continue;
+    // timed things: will it be blocking when we get there (give or take a moment)?
+    if (o.pair) continue; // timed gates are handled on their own (see aiInput)
+    if (o.solidAt) { const eta = Math.max(0, d) * k.path.seg / Math.max(8, k.speed); if (!o.solidAt(eta - 0.4) && !o.solidAt(eta) && !o.solidAt(eta + 0.5)) continue; }
+    else if (!o.on) continue;
+    out.push(o);
   }
   return out;
 }
@@ -3787,7 +4057,7 @@ function respawn(k) {
   let i = k.idx, lat = lats[0];
   if (P.gap && i > P.gap.r0 - 6 && i <= P.gap.g1) i = Math.max(0, P.gap.r0 - Math.round(12 / P.seg)); // never on a jump
   // the spot it got stuck, either side of the road, then further back; clear of obstacles a little ahead too
-  const clear = () => !OBST.some(o => o.solid && (obstacleOverlap(o, k.pos, 2.5) ||
+  const clear = () => !OBST.some(o => o.solid && (o.solidAt || o.on) && (obstacleOverlap(o, k.pos, 2.5) ||
     obstacleOverlap(o, tmpV.set(k.pos.x + P.T[i].x * 8, 0, k.pos.z + P.T[i].z * 8), 2.5)));
   search: for (let back = 0; back < 30; back++, i = P.loop ? wi(i - 4) : Math.max(0, i - 4)) {
     for (lat of lats) {
@@ -4097,7 +4367,7 @@ function updateProjectiles(dt) {
         if (q.type === 'banana' && q.pos.distanceToSquared(p.pos) < 1.8 * 1.8) { removeProj(q); p.life = 0; break; }
       }
       for (const o of OBST) {
-        if (o.solid && obstacleOverlap(o, p.pos, 0.5)) {
+        if (o.solid && o.on && obstacleOverlap(o, p.pos, 0.5)) {
           p.life = 0;
           for (let q = 0; q < 10; q++) emit(sparks, p.pos.x, p.pos.y + 0.5, p.pos.z, rand(-5, 5), rand(2, 6), rand(-5, 5), 0xffffff, 0.4, 0.6, 14);
           break;
@@ -4230,12 +4500,24 @@ function aiInput(k, dt) {
   }
   // steer round obstacles: find the nearest one in our lane, then the closest lane that clears it
   // and anything else beside it
+  // timed gates: work out when we'll get to the next one and head for the half that will be open then
+  let gate = null, gd = Infinity;
+  for (const o of OBST) {
+    if (!o.pair || o.path !== P) continue;
+    let d = o.i - k.idx; if (d > N / 2) d -= N; else if (d < -N / 2) d += N;
+    if (d > -2 && d < look + 45 && d < gd) { gd = d; gate = o; }
+  }
+  if (gate) {
+    const eta = Math.max(0, gd) * P.seg / Math.max(10, k.speed), worst = o => Math.max(o.heightAt(eta - 0.25), o.heightAt(eta + 0.35));
+    const open = worst(gate) <= worst(gate.pair) ? gate : gate.pair;
+    lane = open.lat * 0.9;
+  }
   // (potholes only cost a little speed, so the computer drivers don't swerve for them)
   let blocked = false;
   const obs = obstaclesAhead(k, look + 30).filter(o => o.solid);
   if (obs.length) {
     const along = o => { let d = o.i - k.idx; if (P.loop) { if (d > N / 2) d -= N; else if (d < -N / 2) d += N; } return d; };
-    const hits = (l, o) => Math.abs(l - o.lat) < o.w / 2 + 2;
+    const hits = (l, o) => Math.abs(l - o.lat) < (o.aiW ?? o.w) / 2 + 2;
     let first = null;
     for (const o of obs) if ((hits(lane, o) || hits(k.lat, o)) && (!first || along(o) < along(first))) first = o;
     if (first) {
@@ -4247,7 +4529,7 @@ function aiInput(k, dt) {
       // keep the side already chosen for this obstacle while it stays clear, so it doesn't swerve late
       if (ai.avoid && ai.avoid.o === first && free(ai.avoid.lane)) best = ai.avoid.lane;
       else for (const o of group) for (const s of [-1, 1]) {
-        const c = o.lat + s * (o.w / 2 + 2.4);
+        const c = o.lat + s * ((o.aiW ?? o.w) / 2 + 2.4);
         if (!free(c)) continue;
         if (Math.abs(c - lane) < bd) { bd = Math.abs(c - lane); best = c; }
       }
