@@ -966,16 +966,16 @@ function ribbon(fa, fb, ya, yb, vScale, mat, parent = levelGroup, P = MAIN) {
   return m;
 }
 
-// a surface swept along samples i0..i1; shape(j, s, a) -> [lat, yOffset]
-function sweep(i0, i1, M, shape, mat, uScale = 4) {
+// a surface swept along samples i0..i1 of road P; shape(j, s, a) -> [lat, yOffset]
+function sweep(i0, i1, M, shape, mat, uScale = 4, P = MAIN) {
   const pos = [], uv = [], idx = [];
   const rows = i1 - i0 + 1;
   for (let r = 0; r < rows; r++) {
-    const j = wi(i0 + r), p = TP[j], s = TS[j];
+    const j = P.loop ? wi(i0 + r) : clamp(i0 + r, 0, P.n - 1), p = P.P[j], s = P.S[j];
     for (let c = 0; c <= M; c++) {
       const [lat, y] = shape(j, r / (rows - 1), c / M);
       pos.push(p.x + s.x * lat, p.y + y, p.z + s.z * lat);
-      uv.push(c / M * uScale, r * SEG / 10);
+      uv.push(c / M * uScale, r * P.seg / 10);
       if (r < rows - 1 && c < M) {
         const a = r * (M + 1) + c, b = a + M + 1;
         idx.push(a, b, a + 1, a + 1, b, b + 1);
@@ -1640,6 +1640,108 @@ function addTerrain(E, natural, o = {}) {
     const gx = clamp((x - E.cx + size / 2) / step, 0, segs - 0.001), gz = clamp((z - E.cz + size / 2) / step, 0, segs - 0.001);
     const ix = gx | 0, iz = gz | 0, fx = gx - ix, fz = gz - iz, at = (a, b) => heights[b * row + a];
     return lerp(lerp(at(ix, iz), at(ix + 1, iz), fx), lerp(at(ix, iz + 1), at(ix + 1, iz + 1), fx), fz);
+  };
+}
+
+// A tunnel (or a rock arch, if short) over samples i0..i1 of road P: a lining arched over the road,
+// a lumpy mass of rock heaped on top (spreading `bulk` sideways and `rise` up at its middle), and
+// lamps along the walls inside.
+function addTunnel(P, i0, i1, o = {}) {
+  const { height = 13, bulk = 38, rise = 40, rock = 0x8d8a86, lining = ['#7a726a', ['#6a625a', '#8a827a', '#5a524a']], lamps = true } = o;
+  const archW = j => (P.wL[j] + P.wR[j]) / 2 + 0.4, archC = j => (P.wR[j] - P.wL[j]) / 2;
+  sweep(i0, i1, 16, (j, s, a) => [archC(j) + Math.cos(Math.PI * a) * archW(j), Math.sin(Math.PI * a) * height],
+    lambert({ map: canvasTex(PAINT.gravel(...lining), 1, 1), side: THREE.DoubleSide }), 4, P);
+  sweep(i0, i1, 16, (j, s, a) => {
+    const bump = Math.sin(Math.PI * s);
+    const w = archW(j) + 4 + bulk * bump * (0.85 + 0.3 * hash(a * 7.1 + s * 13.3));
+    const h = height + 2 + rise * bump * (0.8 + 0.4 * hash(a * 3.3 + s * 29.7));
+    return [archC(j) + Math.cos(Math.PI * a) * w, Math.sin(Math.PI * a) * h - 2];
+  }, lambert({ color: rock, flatShading: true, side: THREE.DoubleSide }), 4, P);
+  if (!lamps) return;
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0xffd27a });
+  const step = Math.max(1, Math.round(30 / P.seg));
+  for (let r = Math.round(14 / P.seg); r < i1 - i0 - 4; r += step) {
+    const j = P.loop ? wi(i0 + r) : i0 + r;
+    for (const lat of [P.wR[j] - 0.4, -P.wL[j] + 0.4]) {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 3), lampMat);
+      placeOnTrack(lamp, j, lat, height * 0.55, false, P);
+      levelGroup.add(lamp);
+    }
+  }
+}
+
+// Falling rocks over stretches of the main road: zones are { i0, i1, side } (side: which edge is
+// uphill). While someone's in or nearly at a zone, a rock tumbles down from the uphill side to a spot
+// just ahead of them; a pulsing red ring shows where it will land. Warning signs at each zone's start.
+// The host decides where they fall in an online race (sent as 'bomb', which calls .bomb on guests).
+function addRockfall(zones, o = {}) {
+  const { size = 1.8, radius = 5, every = [1.4, 2.6], drop = 28, out = 30, color = 0x8a7a6a, pole = lambert({ color: 0x6a7380 }) } = o;
+  for (const z of zones) z.t = rand(1, 3);
+  const warn = lambert({ map: canvasTex(makeCanvas(128, 112, (g, w, h) => {
+    g.fillStyle = '#FFFFFF'; g.beginPath(); g.moveTo(w / 2, 4); g.lineTo(w - 4, h - 4); g.lineTo(4, h - 4); g.closePath(); g.fill();
+    g.strokeStyle = '#E8363C'; g.lineWidth = 10; g.stroke();
+    g.fillStyle = '#1B1330';
+    for (const [x, y, r] of [[52, 62, 9], [74, 76, 7], [60, 86, 6], [80, 52, 5]]) { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+  })), side: THREE.DoubleSide });
+  for (const z of zones) for (const j of [wi(z.i0 - 30), z.i0]) {
+    const s = new THREE.Group();
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(3, 2.6), warn); board.position.y = 3.6; board.rotation.y = Math.PI;
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3, 6), pole); post.position.y = 1.5;
+    s.add(board, post);
+    placeOnTrack(s, j, -z.side * ((z.side > 0 ? wallL[j] : wallR[j]) + 0.8));
+    levelGroup.add(s);
+  }
+  const rocks = [];
+  const ringGeo = new THREE.RingGeometry(radius * 0.72, radius * 0.92, 28).rotateX(-Math.PI / 2);
+  const rockGeo = new THREE.DodecahedronGeometry(size, 0), rockMat = lambert({ color, flatShading: true });
+  const dropRock = (i, lat) => {
+    const z = zones.find(z => wi(i - z.i0) <= wi(z.i1 - z.i0)) || zones[0];
+    const to = new V3(TP[i].x + TS[i].x * lat, TP[i].y, TP[i].z + TS[i].z * lat);
+    const w = (z.side > 0 ? wallR[i] : wallL[i]) + out;
+    const from = new V3(TP[i].x + TS[i].x * z.side * w, TP[i].y + drop, TP[i].z + TS[i].z * z.side * w);
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+    ring.position.set(to.x, to.y + 0.08, to.z);
+    const mesh = new THREE.Mesh(rockGeo, rockMat);
+    levelGroup.add(ring, mesh);
+    rocks.push({ t: 0, dur: 2.2, from, to, ring, mesh });
+  };
+  const clear = () => { for (const r of rocks) { levelGroup.remove(r.ring, r.mesh); r.ring.material.dispose(); } rocks.length = 0; };
+  return {
+    reset() { clear(); for (const z of zones) z.t = rand(1, 3); },
+    bomb: dropRock,
+    update(dt, t) {
+      if (state === 'race' && karts.length && (!net || net.host)) {
+        for (const z of zones) {
+          const k = karts.find(k => k.path === MAIN && wi(k.idx - z.i0 + 60) < wi(z.i1 - z.i0) + 60);
+          if (!k) continue;
+          z.t -= dt;
+          if (z.t > 0) continue;
+          z.t = rand(every[0], every[1]);
+          const ahead = wi(k.idx + Math.floor(rand(35, 70)) - z.i0);
+          if (ahead > wi(z.i1 - z.i0)) continue;
+          const i = wi(z.i0 + ahead), lat = r2(rand(-Math.min(HALF, wallL[i]) + 2, Math.min(HALF, wallR[i]) - 2));
+          dropRock(i, lat);
+          if (net) netSend({ t: 'bomb', r: net.race, i, lat });
+        }
+      }
+      for (let n = rocks.length - 1; n >= 0; n--) {
+        const r = rocks[n];
+        r.t += dt;
+        const u = Math.min(1, r.t / r.dur);
+        r.mesh.position.lerpVectors(r.from, r.to, u);
+        r.mesh.position.y += Math.sin(Math.PI * u) * 6 + size * 0.9;
+        r.mesh.rotation.x += dt * 6; r.mesh.rotation.z += dt * 4;
+        r.ring.material.opacity = 0.45 + 0.45 * Math.abs(Math.sin(t * 10));
+        r.ring.scale.setScalar(1.25 - 0.25 * u);
+        if (u >= 1) {
+          for (let q = 0; q < 10; q++) emit(dust, r.to.x + rand(-2, 2), r.to.y + 1, r.to.z + rand(-2, 2), rand(-4, 4), rand(2, 6), rand(-4, 4), 0x9a8a7a, 1.2, 4);
+          if (player && player.pos.distanceTo(r.to) < 80) { sfx.boom(); if (player.pos.distanceTo(r.to) < 22) shake = 0.3; }
+          for (const k of karts) { const dx = k.pos.x - r.to.x, dz = k.pos.z - r.to.z; if (dx * dx + dz * dz < radius * radius) hitKart(k, null); }
+          levelGroup.remove(r.ring, r.mesh); r.ring.material.dispose();
+          rocks.splice(n, 1);
+        }
+      }
+    },
   };
 }
 
@@ -2428,104 +2530,19 @@ function decoZuma(E) {
   }
 
   // the tunnel through a rock outcrop near the top
-  if (tunnel) {
-    const { i0, i1 } = tunnel;
-    const archW = j => (wallL[j] + wallR[j]) / 2 + 0.4, archC = j => (wallR[j] - wallL[j]) / 2;
-    sweep(i0, i1, 16, (j, s, a) => [archC(j) + Math.cos(Math.PI * a) * archW(j), Math.sin(Math.PI * a) * 13],
-      lambert({ map: canvasTex(PAINT.gravel('#7a726a', ['#6a625a', '#8a827a', '#5a524a']), 1, 1), side: THREE.DoubleSide }));
-    sweep(i0, i1, 16, (j, s, a) => {
-      const bump = Math.sin(Math.PI * s);
-      const w = archW(j) + 4 + 38 * bump * (0.85 + 0.3 * hash(a * 7.1 + s * 13.3));
-      const h = 15 + 40 * bump * (0.8 + 0.4 * hash(a * 3.3 + s * 29.7));
-      return [archC(j) + Math.cos(Math.PI * a) * w, Math.sin(Math.PI * a) * h - 2];
-    }, lambert({ color: 0x8d8a86, flatShading: true, side: THREE.DoubleSide }));
-    const lampMat = new THREE.MeshBasicMaterial({ color: 0xffd27a });
-    for (let j = i0 + 10; j < i1 - 5; j += 22) for (const lat of [wallR[j] - 0.4, -wallL[j] + 0.4]) {
-      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 3), lampMat);
-      placeOnTrack(lamp, j, lat, 7);
-      levelGroup.add(lamp);
-    }
-  }
+  if (tunnel) addTunnel(MAIN, tunnel.i0, tunnel.i1);
 
-  // ---- falling rocks: in two marked stretches of the climb, rocks tumble down from the uphill side.
-  // A red ring shows where each will land; the host decides where they fall in an online race.
+  // ---- falling rocks: in two marked stretches of the climb, rocks tumble down from the uphill side
   const zones = [[[185, -222], [85, -230]], [[160, -326], [60, -333]]].map(([a, b]) => {
     const i0 = at(...a), i1 = at(...b), mid = wi(i0 + Math.round(wi(i1 - i0) / 2));
     const side = Math.sign((mx - TP[mid].x) * TS[mid].x + (mz - TP[mid].z) * TS[mid].z) || 1; // towards the massif
-    return { i0, i1, side, t: rand(1, 3) };
+    return { i0, i1, side };
   });
-  const warn = lambert({ map: canvasTex(makeCanvas(128, 112, (g, w, h) => {
-    g.fillStyle = '#FFFFFF'; g.beginPath(); g.moveTo(w / 2, 4); g.lineTo(w - 4, h - 4); g.lineTo(4, h - 4); g.closePath(); g.fill();
-    g.strokeStyle = '#E8363C'; g.lineWidth = 10; g.stroke();
-    g.fillStyle = '#1B1330';
-    for (const [x, y, r] of [[52, 62, 9], [74, 76, 7], [60, 86, 6], [80, 52, 5]]) { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
-  })), side: THREE.DoubleSide });
-  for (const z of zones) for (const j of [wi(z.i0 - 30), z.i0]) {
-    const s = new THREE.Group();
-    const board = new THREE.Mesh(new THREE.PlaneGeometry(3, 2.6), warn); board.position.y = 3.6; board.rotation.y = Math.PI;
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3, 6), signPole); pole.position.y = 1.5;
-    s.add(board, pole);
-    placeOnTrack(s, j, -z.side * (wallR[j] + 0.8));
-    levelGroup.add(s);
-  }
-  const rocks = [];
-  const ringGeo = new THREE.RingGeometry(3.6, 4.6, 28).rotateX(-Math.PI / 2);
-  const rockMeshGeo = new THREE.DodecahedronGeometry(1.8, 0), rockMat = lambert({ color: 0x8a7a6a, flatShading: true });
-  const dropRock = (i, lat) => {
-    const z = zones.find(z => wi(i - z.i0) <= wi(z.i1 - z.i0)) || zones[0];
-    const to = new V3(TP[i].x + TS[i].x * lat, TP[i].y, TP[i].z + TS[i].z * lat);
-    const w = z.side > 0 ? wallR[i] : wallL[i];
-    const from = new V3(TP[i].x + TS[i].x * z.side * (w + 30), TP[i].y + 28, TP[i].z + TS[i].z * z.side * (w + 30));
-    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
-    ring.position.set(to.x, to.y + 0.08, to.z);
-    const mesh = new THREE.Mesh(rockMeshGeo, rockMat);
-    levelGroup.add(ring, mesh);
-    rocks.push({ t: 0, dur: 2.2, from, to, ring, mesh });
-  };
-  const clearRocks = () => { for (const r of rocks) { levelGroup.remove(r.ring, r.mesh); r.ring.material.dispose(); } rocks.length = 0; };
+  const fall = addRockfall(zones, { pole: signPole });
 
   addClouds(E, 14);
 
-  return {
-    moving: [],
-    groundAt: heightAt,
-    reset() { clearRocks(); for (const z of zones) z.t = rand(1, 3); },
-    bomb: dropRock, // online guests drop the rocks the host aims
-    update(dt, t) {
-      if (state === 'race' && karts.length && (!net || net.host)) {
-        for (const z of zones) {
-          // only while someone is in or nearly at this stretch
-          const k = karts.find(k => k.path === MAIN && wi(k.idx - z.i0 + 60) < wi(z.i1 - z.i0) + 60);
-          if (!k) continue;
-          z.t -= dt;
-          if (z.t > 0) continue;
-          z.t = rand(1.4, 2.6);
-          const ahead = wi(k.idx + Math.floor(rand(35, 70)) - z.i0);
-          if (ahead > wi(z.i1 - z.i0)) continue;
-          const i = wi(z.i0 + ahead), lat = r2(rand(-HALF + 2, HALF - 2));
-          dropRock(i, lat);
-          if (net) netSend({ t: 'bomb', r: net.race, i, lat });
-        }
-      }
-      for (let n = rocks.length - 1; n >= 0; n--) {
-        const r = rocks[n];
-        r.t += dt;
-        const u = Math.min(1, r.t / r.dur);
-        r.mesh.position.lerpVectors(r.from, r.to, u);
-        r.mesh.position.y += Math.sin(Math.PI * u) * 6 + 1.6;
-        r.mesh.rotation.x += dt * 6; r.mesh.rotation.z += dt * 4;
-        r.ring.material.opacity = 0.45 + 0.45 * Math.abs(Math.sin(t * 10));
-        r.ring.scale.setScalar(1.25 - 0.25 * u);
-        if (u >= 1) {
-          for (let q = 0; q < 10; q++) emit(dust, r.to.x + rand(-2, 2), r.to.y + 1, r.to.z + rand(-2, 2), rand(-4, 4), rand(2, 6), rand(-4, 4), 0x9a8a7a, 1.2, 4);
-          if (player && player.pos.distanceTo(r.to) < 80) { sfx.boom(); if (player.pos.distanceTo(r.to) < 22) shake = 0.3; }
-          for (const k of karts) { const dx = k.pos.x - r.to.x, dz = k.pos.z - r.to.z; if (dx * dx + dz * dz < 5 * 5) hitKart(k, null); }
-          levelGroup.remove(r.ring, r.mesh); r.ring.material.dispose();
-          rocks.splice(n, 1);
-        }
-      }
-    },
-  };
+  return { moving: [], groundAt: heightAt, reset: fall.reset, bomb: fall.bomb, update: fall.update };
 }
 
 // a wall pattern in the Benin style: deep red with gold and cream bands of zigzags and rings
@@ -2839,6 +2856,96 @@ function decoPlateau(E) {
   };
 }
 
+function decoOlumo(E) {
+  const sc = L.scale;
+  const at = (x, z) => nearestOn(MAIN, x * sc, z * sc, 0, N - 1).i;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new V3(0, 1, 0), e = new THREE.Euler(), col = new THREE.Color();
+  const flat = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), lambert({ color: 0x5aa04a }));
+  flat.rotation.x = -Math.PI / 2; flat.position.set(E.cx, -0.6, E.cz);
+  levelGroup.add(flat);
+  const rc = new V3(95 * sc, 0, -105 * sc), town = new V3(-20 * sc, 0, 20 * sc);
+  const natural = (x, z) => {
+    const rock = 26 * Math.exp(-((x - rc.x) ** 2 + (z - rc.z) ** 2) / (2 * 150 * 150));
+    const hills = 7 * (Math.sin(x * 0.011 + 1) * Math.cos(z * 0.013) + 0.7) * clamp((Math.hypot(x - town.x, z - town.z) - 140) / 200, 0, 1);
+    const edge = clamp((850 - Math.max(Math.abs(x - E.cx), Math.abs(z - E.cz))) / 150, 0, 1);
+    return (rock + Math.max(0, hills)) * edge;
+  };
+  const heightAt = addTerrain(E, natural, { grass: [0x5aa04a, 0x4f9440, 0x67ab50], earth: 0xb0603a, rock: 0x9a9088, rockAbove: 999 });
+  addMountains(E, { colors: [0x7aa070, 0x8aa888, 0x6f9468], snow: 0, count: 18, h: [60, 130], w: [160, 240], y: -5 });
+
+  // granite domes: the great rock formation (either side of the cave) and a ring of smaller ones
+  const streak = canvasTex(makeCanvas(256, 128, (g, w, h) => {
+    g.fillStyle = '#9a9088'; g.fillRect(0, 0, w, h);
+    for (let k = 0; k < 80; k++) { g.fillStyle = Math.random() < 0.6 ? 'rgba(60,52,46,0.3)' : 'rgba(220,206,190,0.3)'; g.fillRect(Math.random() * w, rand(0, h * 0.4), rand(1, 4), rand(h * 0.3, h)); }
+  }), 5, 1);
+  const domeMat = lambert({ map: streak, flatShading: true });
+  const domeGeo = (() => {
+    const prof = [[0, 1], [0.35, 0.96], [0.62, 0.86], [0.84, 0.66], [0.97, 0.36], [1.03, 0.1], [1.04, -0.2]].map(([r, h]) => new THREE.Vector2(r, h));
+    const g = new THREE.LatheGeometry(prof, 18), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const f = 1 + (hash(p.getX(i) * 5.3 + p.getZ(i) * 2.9 + p.getY(i) * 9) - 0.5) * 0.08; p.setX(i, p.getX(i) * f); p.setZ(i, p.getZ(i) * f); }
+    g.computeVertexNormals();
+    return g;
+  })();
+  const clearOf = (x, z, r) => PATHS.every(P => { const qq = nearestOn(P, x, z, 0, P.n - 1); return !qq.inside || Math.abs(qq.lat) > Math.max(P.wL[qq.i], P.wR[qq.i]) + r + 2 || Math.hypot(x - P.P[qq.i].x, z - P.P[qq.i].z) > r + Math.max(P.wL[qq.i], P.wR[qq.i]) + 2; });
+  let placed = 0;
+  for (let tries = 0; tries < 400 && placed < 16; tries++) {
+    const big = placed < 7, a = rand(0, TAU), d = big ? rand(0, 110) : rand(150, 420);
+    const x = rc.x + Math.cos(a) * d, z = rc.z + Math.sin(a) * d, r = big ? rand(16, 30) : rand(10, 20);
+    if (!clearOf(x, z, r)) continue;
+    const dome = new THREE.Mesh(domeGeo, domeMat);
+    dome.scale.set(r, r * rand(1.2, 1.9), r * rand(0.8, 1.1)); dome.rotation.y = rand(0, TAU);
+    dome.position.set(x, heightAt(x, z) - 1, z);
+    levelGroup.add(dome);
+    placed++;
+  }
+  // big boulders hemming in the narrow corridors, just beyond the barriers
+  const boulders = [];
+  for (const nr of L.narrow) {
+    const i0 = at(...nr.from), len = wi(at(...nr.to) - i0);
+    for (let d = 0; d <= len; d += Math.round(16 / SEG)) for (const s of [-1, 1]) {
+      const j = wi(i0 + d), r = rand(4, 8), lat = s * ((s > 0 ? wallR[j] : wallL[j]) + r + 1.5);
+      const x = TP[j].x + TS[j].x * lat, z = TP[j].z + TS[j].z * lat;
+      if (clearOf(x, z, r * 0.6)) boulders.push([x, z, r]);
+    }
+  }
+  const bMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 1), lambert({ color: 0x9a9088, flatShading: true }), Math.max(1, boulders.length));
+  boulders.forEach(([x, z, r], n) => { q.setFromEuler(e.set(rand(0, 3), rand(0, 3), 0)); bMesh.setMatrixAt(n, m.compose(new V3(x, heightAt(x, z) + r * 0.5, z), q, new V3(r, r * rand(0.8, 1.3), r))); });
+  levelGroup.add(bMesh);
+
+  // the wide natural rock arch over the road near the top, and the cave on the shortcut
+  addTunnel(MAIN, at(32, -163), at(12, -152), { height: 17, bulk: 18, rise: 12, rock: 0x9a9088, lamps: false });
+  for (const B of BRANCHES) addTunnel(B, B.mouthA + 4, B.mouthB - 4, { height: 9.5, bulk: 26, rise: 22, rock: 0x9a9088, lining: ['#6f6860', ['#5f5850', '#7f786e', '#4f4a44']] });
+
+  // the town around the square: terracotta roofs, ochre and cream walls, palms and trees
+  const sq = new THREE.Mesh(new THREE.CircleGeometry(95, 40).rotateX(-Math.PI / 2), lambert({ map: canvasTex(PAINT.pavement('#d9c8a8', '#b8a580'), 14, 14) }));
+  sq.position.set(TP[0].x, TP[0].y - 0.25, TP[0].z + 0); levelGroup.add(sq);
+  const homes = E.spots(70, WALL + 14, 20, (x, z) => Math.hypot(x - town.x, z - town.z) < 230 && Math.hypot(x - TP[0].x, z - TP[0].z) > 96);
+  const hb = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), lambert({ map: canvasTex(PAINT.windows(1, false)) }), Math.max(1, homes.length));
+  const hr = new THREE.InstancedMesh(new THREE.ConeGeometry(0.75, 0.45, 4).rotateY(Math.PI / 4).translate(0, 0.22, 0), lambert({ color: 0xb5562f, flatShading: true }), Math.max(1, homes.length));
+  homes.forEach(([x, z], n) => {
+    const w = rand(9, 14), d = rand(8, 12), ht = rand(4, 7), y = heightAt(x, z);
+    q.setFromAxisAngle(up, rand(0, TAU));
+    hb.setMatrixAt(n, m.compose(new V3(x, y, z), q, new V3(d, ht, w))); hb.setColorAt(n, col.setHex([0xE3B98A, 0xF3E5C0, 0xD9A066, 0xF0D9B5][n % 4]));
+    hr.setMatrixAt(n, m.compose(new V3(x, y + ht, z), q, new V3(d * 1.4, 5, w * 1.4)));
+  });
+  levelGroup.add(hb, hr);
+  const green = E.spots(170, WALL + 8, 220, (x, z) => heightAt(x, z) < 22);
+  addPalms(green.slice(0, 40).map(([x, z]) => [x, z, heightAt(x, z)]));
+  addTrees(green.slice(40).map(([x, z]) => [x, z, heightAt(x, z)]), { roundP: 0.85, hue: [0.24, 0.34], lig: [0.26, 0.38], scale: [0.9, 1.5] });
+
+  // small stones falling in two stretches: on the climb round the formation, and on a switchback
+  const zones = [[[163, -78], [152, -140]], [[-80, -112], [-40, -105]]].map(([a, b]) => {
+    const i0 = at(...a), i1 = at(...b), mid = wi(i0 + Math.round(wi(i1 - i0) / 2)), p = TP[mid], s = TS[mid];
+    const side = heightAt(p.x + s.x * 40, p.z + s.z * 40) > heightAt(p.x - s.x * 40, p.z - s.z * 40) ? 1 : -1;
+    return { i0, i1, side };
+  });
+  const fall = addRockfall(zones, { size: 1.2, radius: 4, drop: 20, out: 18, color: 0x9a9088 });
+
+  addClouds(E, 12);
+
+  return { moving: [], groundAt: heightAt, reset: fall.reset, bomb: fall.bomb, update: fall.update };
+}
+
 const LEVELS = [
   {
     name: 'Danfo Dash', tag: 'Lagos · City circuit', band: 'linear-gradient(180deg,#FFC21F 0 50%,#4e5159 50%)',
@@ -2948,6 +3055,25 @@ const LEVELS = [
     arch: { post: 0x2f5a3a, bg: '#2f5a3a', text: '#FFFFFF', stripe: '#FFD23F' },
     shoulder: () => PAINT.gravel('#8a8a5a', ['#7a7a4a', '#9a9a6a', '#6a6a44']), base: 'ground', deco: decoPlateau, dust: 0x9a8a6a, theme: 9,
     pads: [[0.06, 0], [0.4, 0], [0.75, 0], [0.9, 0]], boxes: [0.11, 0.5, 0.8],
+  },
+  {
+    name: 'Olumo Rock Rush', tag: 'Abeokuta · Rock circuit', band: 'linear-gradient(180deg,#f2c46a 0 30%,#9a9088 30% 62%,#b0603a 62%)',
+    scale: 1.5, groundY: 0, hills: true, stoneEdges: true,
+    cp: [[-60, 0, 1], [40, 0, 1], [100, -10, 3], [150, -45, 7], [165, -100, 11], [145, -155, 15], [95, -180, 18], [40, -165, 20], [0, -140, 20],
+      [-40, -150, 19], [-90, -160, 17], [-122, -153, 16], [-136, -133, 15], [-122, -115, 14], [-90, -112, 13], [-45, -106, 11],
+      [-22, -96, 10], [-16, -77, 9], [-32, -62, 8], [-80, -58, 6], [-125, -53, 5], [-150, -42, 4], [-155, -22, 3], [-138, -8, 2], [-100, -3, 1]],
+    // a cave through the rock formation that cuts off the big climbing curve
+    branches: [{ from: [150, -45], to: [95, -180], cp: [[128, -80, 10], [118, -120, 13], [108, -158, 16]], half: 4.5, ai: 0.4 }],
+    branchLook: { road: ['#6a5a50', 'rgba(255,255,255,0.4)', 'rgba(0,0,0,0)'], wall: ['#9a9088', '#7f776e', '#5a544e'], shoulder: () => PAINT.gravel('#8a7a6a', ['#7a6a5a', '#9a8a7a']) },
+    // tight rock corridors: through the arch and round the switchbacks
+    narrow: [{ from: [62, -172], to: [-12, -142], wall: 14 }, { from: [-80, -160], to: [-80, -112], wall: 14 },
+      { from: [-35, -106], to: [-45, -60], wall: 14 }, { from: [-118, -55], to: [-125, -5], wall: 14 }],
+    gravel: [[[-100, -160], [-100, -113], 'outer'], [[-135, -50], [-128, -6], 'outer']],
+    sky: [0x5aa6e8, 0xfbe6c4], fog: [260, 950], hemi: [0xfff3dc, 0x6a5a3a, 0.95], sun: [0xffdca0, 0.8],
+    road: ['#6a4e40', '#F3E5C0', 'rgba(255,255,255,0.45)'], curb: ['#a39a90', '#7f776e'], wall: ['#d9cfc2', '#b0603a', '#5a544e'],
+    arch: { post: 0x5a544e, bg: '#b0603a', text: '#FFFFFF', stripe: '#F3E5C0' },
+    shoulder: () => PAINT.gravel('#b0603a', ['#9a5232', '#c27048', '#8a4a2c']), base: 'ground', deco: decoOlumo, dust: 0xb0603a, theme: 10,
+    pads: [[0.05, 0], [0.3, 0], [0.58, 0], [0.92, 0]], boxes: [0.12, 0.47, 0.8],
   },
   {
     name: 'Pepper Hill', tag: 'Rolling green hills', band: 'linear-gradient(180deg,#8FD3F5 0 55%,#62B84A 55%)',
@@ -3099,8 +3225,14 @@ function buildLevel(li) {
   const inL = (j, w) => -Math.min(w, wallL[j]), inR = (j, w) => Math.min(w, wallR[j]);
   ribbon(j => inL(j, HALF), j => inR(j, HALF), 0, 0, ROAD_W, lambert({ map: canvasTex(PAINT.road(...L.road)) }));
   const curbMat = lambert({ map: canvasTex(PAINT.stripe(L.curb[0], L.curb[1])) });
-  ribbon(j => inL(j, HALF + 1.6), j => inL(j, HALF), 0.015, 0.015, 3, curbMat);
-  ribbon(j => inR(j, HALF), j => inR(j, HALF + 1.6), 0.015, 0.015, 3, curbMat);
+  const ky = L.stoneEdges ? 0.3 : 0.015; // raised stone edges stand up from the road
+  ribbon(j => inL(j, HALF + 1.6), j => inL(j, HALF), ky, ky, 3, curbMat);
+  ribbon(j => inR(j, HALF), j => inR(j, HALF + 1.6), ky, ky, 3, curbMat);
+  if (L.stoneEdges) {
+    const face = lambert({ color: 0x6f6a62, side: THREE.DoubleSide });
+    ribbon(j => inL(j, HALF), j => inL(j, HALF), 0, ky, 3, face);
+    ribbon(j => inR(j, HALF), j => inR(j, HALF), 0, ky, 3, face);
+  }
   if (L.shoulder) {
     const sh = lambert({ map: canvasTex(L.shoulder()) });
     ribbon(j => -wallL[j], j => inL(j, HALF + 1.6), -0.01, -0.01, 8, sh);
@@ -3734,6 +3866,15 @@ const THEMES = [
     drums: { kick: 'x...x...x...x...', clap: '....x.......x...', shaker: 'x.x.x.x.x.x.x.x.', fill: '....x.......xxxx', snare: '....x.......x...' },
     amb: 'hills',
   },
+  { // 10 Olumo Rock Rush: bouncing talking-drum groove with a bright plucked melody
+    bpm: 114, scale: 'major', leadBase: 71, bassBase: 43, arpBase: 62, chords: [0, 4, 5, 3, 0, 4, 3, 4],
+    lead: ['4.4.2.0.2...4...', '5.5.4.2.4...5...', '7.5.4.2.4...2...', '0.2.4.5.4-------',
+      '7.7.9.7.5...4...', '5.5.7.5.4...2...', '4.5.7.9.7.5.4.2.', '1.2.4.2.0-------'],
+    leadVoice: 'pluck', leadVol: 0.11, bass: 'R..R.5..R..R.O..', bassVoice: 'sineBass', bassVol: 0.17,
+    arp: '0..2..4.0..2..4.', arpVoice: 'marimba', arpVol: 0.05,
+    drums: { kick: 'x..x....x..x....', tom: 'h.hm.l..h.hm.l.m', bell: 'x.x.xx.x.x.xx.x.', shaker: 'x.xxx.xxx.xxx.xx', clap: '....x.......x...' },
+    amb: 'courtyard',
+  },
 ];
 
 function playStep(th, s, t, sd) {
@@ -4247,7 +4388,9 @@ function respawn(k) {
 // GRAVEL: 1 across the road, 2 on its left edge only, 3 on its right edge only (the outside of a bend)
 const gravelHere = (g, lat) => g === 1 || (g === 2 && lat < -3) || (g === 3 && lat > 3);
 const onGravel = k => !k.fly && (k.path.gravel || (k.path === MAIN && gravelHere(GRAVEL[k.idx], k.lat)));
-const onBumps = k => !k.fly && (k.path.planks || k.path.gravel || (k.path === MAIN && (PLANK[k.idx] || gravelHere(GRAVEL[k.idx], k.lat))));
+// riding up on a track's raised stone edges (the kerbs)
+const onEdge = k => L.stoneEdges && !k.fly && k.path === MAIN && Math.abs(k.lat) > HALF - 0.6 && Math.abs(k.lat) < HALF + 2;
+const onBumps = k => !k.fly && (onEdge(k) || k.path.planks || k.path.gravel || (k.path === MAIN && (PLANK[k.idx] || gravelHere(GRAVEL[k.idx], k.lat))));
 // how well the tyres hold: 1 on dry tarmac, less on wet road, gravel, or just after a puddle
 function gripOf(k) {
   let g = 1;
@@ -4277,6 +4420,11 @@ function updateKart(k, inp, dt) {
   if (k.mudT > 0) { k.mudT -= dt; max *= 0.6; }
   if (k.path.planks || (k.path === MAIN && PLANK[k.idx])) max *= 0.93;
   if (onGravel(k)) max *= 0.88;
+  if (onEdge(k)) { // cut a corner over the raised edge and it costs you
+    max *= 0.72;
+    if (k === player && !k.edgeOn && Math.abs(k.speed) > 12) { sfx.bump(); shake = Math.max(shake, 0.2); }
+  }
+  k.edgeOn = onEdge(k);
   // hilly tracks: going downhill lets you run past your usual top speed
   if (L.hills) { const sl = slopeAlong(k); if (sl < 0) max *= 1 + Math.min(0.2, -sl * 2.2); }
   const off = Math.abs(k.lat) > k.path.half + 1.4;
