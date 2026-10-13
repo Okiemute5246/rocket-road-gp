@@ -304,6 +304,7 @@
   table.res tr.me td.p { color: var(--sun); }
   table.res td.t { text-align: right; }
   table.res td.t.pending { color: var(--muted); font-weight: 500; }
+  table.res td.pts { text-align: right; width: 48px; color: var(--sun); }
   table.res i { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--paper); vertical-align: -2px; margin-right: 8px; }
 
   /* ---------- Touch controls ---------- */
@@ -567,6 +568,7 @@
           </div>
         </div>
         <button class="go" id="startBtn">Start race</button>
+        <button class="btn" id="gpBtn">Grand Prix</button>
         <button class="btn" id="onlineBtn">Play online with friends</button>
         <div class="keys">
           <div><kbd>W</kbd><kbd>&uarr;</kbd> Accelerate</div>
@@ -3605,6 +3607,10 @@ const CUPS = [
 ];
 const cupOf = i => CUPS.findIndex(c => c.tracks.includes(i));
 const raceLabel = i => { const c = CUPS[cupOf(i)]; return `${c.short} · Race ${c.tracks.indexOf(i) + 1}`; };
+// Grand Prix: every track of one cup in a row, with points for each finishing place
+const GP_POINTS = [10, 8, 6, 4, 2, 1];
+const TROPHIES = ['Gold', 'Silver', 'Bronze'];
+let gp = null; // { cup, race, pts: total per driver, last: latest race place per driver, final }
 
 function buildLevel(li) {
   levelIdx = li; L = LEVELS[li];
@@ -4755,7 +4761,8 @@ function buildGrid(spec) {
   finishCount = 0;
   let entries = spec;
   if (!entries) {
-    const others = shuffle(ROSTER.map((d, i) => i).filter(i => i !== playerDef));
+    const others = gp && gp.race ? gpStandings().filter(i => i !== playerDef) // rivals line up in Grand Prix order
+      : shuffle(ROSTER.map((d, i) => i).filter(i => i !== playerDef));
     entries = [...others, playerDef].map(di => ({ def: di, id: di === playerDef ? 'me' : null }));
   }
   const myId = spec ? net.myId : 'me';
@@ -5741,7 +5748,8 @@ function startRace() {
   $('#hud').hidden = false;
   $('#touch').hidden = !isTouch;
   $('#center').textContent = '';
-  toast(`${raceLabel(levelIdx)}: ${L.name}`, 'good', 2200);
+  $('#restartBtn').hidden = !!gp; // no retries in a Grand Prix
+  toast(gp ? `Grand Prix · Race ${gp.race + 1} of ${CUPS[gp.cup].tracks.length}: ${L.name}` : `${raceLabel(levelIdx)}: ${L.name}`, 'good', 2200);
   camera.fov = 68; camera.updateProjectionMatrix();
   updateRanks();
 }
@@ -5769,12 +5777,17 @@ function showResults() {
   $('#touch').hidden = true;
   const place = player.place;
   $('#resTitle').textContent = place === 1 ? 'You won!' : `You finished ${place}${ORD[place - 1]}`;
-  $('#resSub').textContent = `${raceLabel(levelIdx)} · ${L.name} · ${cls}`;
+  $('#resSub').textContent = gp ? `Grand Prix · Race ${gp.race + 1} of ${CUPS[gp.cup].tracks.length} · ${L.name} · ${cls}` : `${raceLabel(levelIdx)} · ${L.name} · ${cls}`;
   $('#resBest').innerHTML = `Race time <b>${fmt(player.time)}</b> &middot; Best lap <b>${fmt(bestLap)}</b>`;
   const last = levelIdx === LEVELS.length - 1;
   const nextOpen = last || levelIdx + 1 <= unlocked;
-  $('#nextBtn').hidden = !nextOpen || !!net;
-  $('#nextBtn').textContent = last ? `Back to ${LEVELS[0].name}` : `Next: ${LEVELS[levelIdx + 1].name}`;
+  $('#nextBtn').hidden = !gp && (!nextOpen || !!net);
+  $('#againBtn').hidden = !!gp;
+  $('#againBtn').textContent = 'Race again';
+  if (gp) {
+    const tracks = CUPS[gp.cup].tracks;
+    $('#nextBtn').textContent = gp.race < tracks.length - 1 ? `Next: ${LEVELS[tracks[gp.race + 1]].name}` : 'Final standings';
+  } else $('#nextBtn').textContent = last ? `Back to ${LEVELS[0].name}` : `Next: ${LEVELS[levelIdx + 1].name}`;
   if (justUnlocked >= 0) {
     const newCup = CUPS.find(c => c.tracks[0] === justUnlocked); // the first track of a cup opens the whole cup
     $('#resBest').insertAdjacentHTML('beforeend', newCup
@@ -5785,14 +5798,61 @@ function showResults() {
   } else if (last && place <= 3) {
     $('#resBest').insertAdjacentHTML('beforeend', `<br><span class="unlock">All four cups conquered!</span>`);
   }
+  if (gp) $('#resBest').insertAdjacentHTML('beforeend', '<br><span id="gpLine"></span>');
   renderResults();
-  (net ? $('#menuBtn') : nextOpen ? $('#nextBtn') : $('#againBtn')).focus({ preventScroll: true });
+  (net ? $('#menuBtn') : gp || nextOpen ? $('#nextBtn') : $('#againBtn')).focus({ preventScroll: true });
   Music.fast = false;
   Music.go();
 }
 function renderResults() {
+  if (gp && gp.final) { // overall standings
+    $('#resBody').innerHTML = gpStandings().map((d, i) => `<tr class="${d === playerDef ? 'me' : ''}"><td class="p">${i + 1}</td><td><i style="background:${hexCss(ROSTER[d].color)}"></i>${d === playerDef ? 'You (' + ROSTER[d].name + ')' : ROSTER[d].name}</td><td class="t">${gp.pts[d]} pts</td></tr>`).join('');
+    return;
+  }
   const order = updateRanks();
-  $('#resBody').innerHTML = order.map(k => `<tr class="${k === player ? 'me' : ''}"><td class="p">${k.rank}</td><td><i style="background:${hexCss(k.def.color)}"></i>${k === player ? 'You (' + k.def.name + ')' : esc(k.name)}</td><td class="t ${k.finished ? '' : 'pending'}">${k.finished ? fmt(k.time) : 'Racing…'}</td></tr>`).join('');
+  $('#resBody').innerHTML = order.map(k => `<tr class="${k === player ? 'me' : ''}"><td class="p">${k.rank}</td><td><i style="background:${hexCss(k.def.color)}"></i>${k === player ? 'You (' + k.def.name + ')' : esc(k.name)}</td><td class="t ${k.finished ? '' : 'pending'}">${k.finished ? fmt(k.time) : 'Racing…'}</td>${gp ? `<td class="pts">+${GP_POINTS[k.rank - 1]}</td>` : ''}</tr>`).join('');
+  if (gp && $('#gpLine')) { // where the player would stand overall if the race ended now
+    const tot = order.map(k => gp.pts[ROSTER.indexOf(k.def)] + GP_POINTS[k.rank - 1]);
+    const mine = tot[order.indexOf(player)], pos = 1 + tot.filter(v => v > mine).length;
+    $('#gpLine').textContent = `Grand Prix: ${pos}${ORD[pos - 1]} overall with ${mine} points`;
+  }
+}
+
+function cupOpen(n) { return CUPS[n].tracks.every(i => i <= unlocked); }
+function startGP(cup) {
+  if (net || !cupOpen(cup)) return;
+  gp = { cup, race: 0, pts: ROSTER.map(() => 0), last: ROSTER.map(() => 0), final: false };
+  const first = CUPS[cup].tracks[0];
+  if (first !== levelIdx || !levelGroup) buildLevel(first);
+  startRace();
+}
+// add this race's points: karts still racing score for the place they're in now
+function gpCommit() {
+  for (const k of updateRanks()) {
+    const d = ROSTER.indexOf(k.def);
+    gp.pts[d] += GP_POINTS[k.rank - 1];
+    gp.last[d] = k.rank;
+  }
+}
+// drivers by points; a tie goes to whoever placed higher in the latest race
+function gpStandings() {
+  return ROSTER.map((d, i) => i).sort((a, b) => gp.pts[b] - gp.pts[a] || gp.last[a] - gp.last[b]);
+}
+function gpNext() {
+  gpCommit();
+  const tracks = CUPS[gp.cup].tracks;
+  if (++gp.race < tracks.length) { buildLevel(tracks[gp.race]); syncMenu(); startRace(); return; }
+  gp.final = true;
+  const mine = gpStandings().indexOf(playerDef) + 1;
+  if (mine <= 3 && !(trophies[gp.cup] <= mine)) { trophies[gp.cup] = mine; saveTrophies(); syncMenu(); }
+  $('#resTitle').textContent = mine === 1 ? 'Grand Prix champion!' : `You finished ${mine}${ORD[mine - 1]} overall`;
+  $('#resSub').textContent = `${CUPS[gp.cup].name} Grand Prix · ${cls}`;
+  $('#resBest').innerHTML = mine <= 3 ? `<span class="unlock">${TROPHIES[mine - 1]} trophy!</span>` : 'Finish in the top 3 overall to win a trophy.';
+  $('#nextBtn').hidden = true;
+  $('#againBtn').hidden = false;
+  $('#againBtn').textContent = 'Race it again';
+  renderResults();
+  $('#againBtn').focus({ preventScroll: true });
 }
 
 function setPaused(on) {
@@ -5808,6 +5868,7 @@ function setPaused(on) {
 
 function toTitle() {
   state = 'title';
+  gp = null;
   if (AC && AC.state === 'suspended') AC.resume();
   $('#results').hidden = true; $('#pause').hidden = true; $('#hud').hidden = true; $('#touch').hidden = true;
   $('#online').hidden = true; $('#lobby').hidden = true;
@@ -5822,6 +5883,11 @@ function toTitle() {
 const UNLOCK_KEY = 'oyakart.unlocked';
 let unlocked = 0, justUnlocked = -1;
 try { unlocked = clamp(parseInt(localStorage.getItem(UNLOCK_KEY), 10) || 0, 0, LEVELS.length - 1); } catch (e) { unlocked = 0; }
+// best Grand Prix finish per cup: 1 gold, 2 silver, 3 bronze (remembered in this browser)
+const TROPHY_KEY = 'oyakart.trophies';
+let trophies = [];
+try { trophies = JSON.parse(localStorage.getItem(TROPHY_KEY)) || []; if (!Array.isArray(trophies)) trophies = []; } catch (e) { trophies = []; }
+function saveTrophies() { try { localStorage.setItem(TROPHY_KEY, JSON.stringify(trophies)); } catch (e) { /* trophies last this session only */ } }
 function saveUnlocked() { try { localStorage.setItem(UNLOCK_KEY, String(unlocked)); } catch (e) { /* progress lasts this session only */ } }
 
 function selectLevel(i) {
@@ -6003,9 +6069,14 @@ document.querySelectorAll('#classSeg button').forEach(b => b.addEventListener('c
 function syncMenu() {
   chips.querySelectorAll('.chip').forEach((b, i) => b.setAttribute('aria-pressed', String(i === playerDef)));
   syncTrackPicker($('#cupTabs'), tracksEl, menuCup, levelIdx, i => `Top 3 on ${LEVELS[i - 1].name} to unlock`);
-  $('#cupTag').textContent = CUPS[menuCup].tag;
+  const tr = trophies[menuCup], open = cupOpen(menuCup);
+  $('#cupTag').textContent = CUPS[menuCup].tag + (tr ? ` · Grand Prix ${TROPHIES[tr - 1].toLowerCase()} trophy` : '');
+  $('#gpBtn').disabled = !open;
+  $('#gpBtn').textContent = `Grand Prix: ${CUPS[menuCup].short}` + (open ? '' : ' (locked)');
+  $('#gpBtn').title = open ? `Race all ${CUPS[menuCup].tracks.length} tracks of the cup in a row for points`
+    : 'Unlock every track in this cup to race its Grand Prix';
   document.querySelectorAll('#classSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === cls)));
-  $('#resetBtn').disabled = unlocked === 0;
+  $('#resetBtn').disabled = unlocked === 0 && !trophies.length;
 }
 // reset needs two clicks: the first arms the button, the second relocks the tracks
 const resetBtn = $('#resetBtn');
@@ -6026,19 +6097,23 @@ resetBtn.addEventListener('click', () => {
   disarmReset();
   unlocked = 0;
   saveUnlocked();
+  trophies = [];
+  saveTrophies();
   if (levelIdx !== 0) buildLevel(0);
   buildGrid();
   syncMenu();
   resetBtn.textContent = 'Progress reset';
   resetArmTimer = setTimeout(disarmReset, 1500);
 });
-$('#startBtn').addEventListener('click', startRace);
+$('#startBtn').addEventListener('click', () => { gp = null; startRace(); });
+$('#gpBtn').addEventListener('click', () => startGP(menuCup));
 $('#resumeBtn').addEventListener('click', () => setPaused(false));
 $('#restartBtn').addEventListener('click', startRace);
 $('#quitBtn').addEventListener('click', () => { if (net) leaveOnline(); else toTitle(); });
-$('#againBtn').addEventListener('click', startRace);
+$('#againBtn').addEventListener('click', () => { if (gp) startGP(gp.cup); else startRace(); });
 $('#menuBtn').addEventListener('click', () => { if (net) showLobby(); else toTitle(); });
 $('#nextBtn').addEventListener('click', () => {
+  if (gp) { gpNext(); return; }
   const next = (levelIdx + 1) % LEVELS.length;
   if (next > unlocked) return;
   buildLevel(next); syncMenu(); startRace();

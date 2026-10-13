@@ -57,7 +57,11 @@ A 3D kart racer that runs in the browser. Race five computer rivals over three l
 | 12 | Palm Forest Rally | A tropical plantation: a broad access road, then red-earth tracks between long rows of palms, a narrow S-bend section, a muddy clearing with a small jump, and a straight home through the plantation. The tree-lined corridors are narrow, so clean driving beats raw speed. Logs and fallen fronds lie at some edges, small branches lie on the road, and the mud is slippery. A narrow maintenance lane through denser palms skips the S-bends |
 | 13 | Mangrove Mayhem | The Niger Delta wetlands: a raised road over the water, down into a winding mangrove corridor, two narrow timber bridges either side of a tight bend, a run of slippery linked curves, and back up onto the raised road. Mud patches and slick bends cut your grip, and mangrove roots creep onto the outside of the turns, so line choice matters. Debris and canoes drift on the water. A short plank boardwalk across the shallows cuts the corridor's big bend |
 
-Finish a track in the top 3 to unlock the next one. A top-3 finish on the last track of a cup opens the next cup. Progress is saved in your browser, and **Reset progress** on the title screen locks the tracks again.
+Finish a track in the top 3 to unlock the next one. A top-3 finish on the last track of a cup opens the next cup. Progress is saved in your browser, and **Reset progress** on the title screen locks the tracks again and clears your trophies.
+
+### Grand Prix
+
+Once you've unlocked every track in a cup, **Grand Prix** on the title screen races them all in a row. Each race scores points by finishing place (10, 8, 6, 4, 2, 1); after the first race, your rivals line up in points order. There are no retries, so make every race count. The most points after the last race wins the cup, and a top-3 finish overall earns a gold, silver or bronze trophy, shown under the cup on the title screen. Ties go to whoever placed higher in the last race.
 
 Each track has its own music and background sounds, generated live with the Web Audio API.
 
