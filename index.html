@@ -871,6 +871,33 @@ const PAINT = {
     g.font = '64px "Arial Black", sans-serif'; g.fillText(title, w / 2, h * 0.4, w - 30);
     g.font = '30px "Arial Black", sans-serif'; g.fillText(sub, w / 2, h * 0.76, w - 30);
   }),
+  // a wet road's sheen: darker puddles and lighter streaks, tinted and made see-through by its material
+  puddles: () => makeCanvas(256, 256, (g, w, h) => {
+    g.fillStyle = '#9aa4b0'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 26; i++) {
+      g.fillStyle = Math.random() < 0.7 ? 'rgba(40,60,90,0.55)' : 'rgba(255,255,255,0.35)';
+      g.beginPath(); g.ellipse(Math.random() * w, Math.random() * h, rand(8, 34), rand(4, 14), rand(0, 3), 0, TAU); g.fill();
+    }
+    g.fillStyle = 'rgba(255,255,255,0.25)';
+    for (let i = 0; i < 40; i++) g.fillRect(Math.random() * w, Math.random() * h, 1.5, rand(10, 40));
+  }),
+  puddle: () => makeCanvas(128, 64, (g, w, h) => {
+    const gr = g.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, w / 2);
+    gr.addColorStop(0, 'rgba(70,110,150,0.85)'); gr.addColorStop(0.7, 'rgba(90,130,170,0.7)'); gr.addColorStop(1, 'rgba(90,130,170,0)');
+    g.fillStyle = gr; g.beginPath(); g.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(w * 0.3, h * 0.35, w * 0.25, 2); g.fillRect(w * 0.5, h * 0.6, w * 0.2, 2);
+  }),
+  // an open concrete drain beside the road
+  drain: () => makeCanvas(32, 64, (g, w, h) => {
+    g.fillStyle = '#9b978d'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#4a5348'; g.fillRect(5, 0, w - 10, h);
+    g.fillStyle = 'rgba(120,150,110,0.6)'; g.fillRect(9, 0, w - 18, h);
+    g.fillStyle = '#7d796f'; g.fillRect(0, h - 3, w, 3);
+  }),
+  corrugated: (base, line) => makeCanvas(64, 64, (g, w, h) => {
+    g.fillStyle = base; g.fillRect(0, 0, w, h);
+    g.fillStyle = line; for (let x = 0; x < w; x += 6) g.fillRect(x, 0, 2, h);
+  }),
   // a pothole, ringed with yellow paint so it's easy to see coming
   pothole: () => makeCanvas(128, 128, (g, w, h) => {
     g.strokeStyle = '#FFC21F'; g.lineWidth = 7; g.setLineDash([14, 9]);
@@ -901,6 +928,7 @@ const fv = (f, j) => typeof f === 'function' ? f(j) : f;
 let MAIN = null, BRANCHES = [], PATHS = [];
 // Things on the road (see "obstacles" below): parked cars, barriers, potholes, moving traffic
 let OBST = [];
+let WET = new Uint8Array(N); // 1 where the main road is wet and slippery
 const pathHeading = (P, i) => Math.atan2(P.T[i].x, P.T[i].z);
 // where a racer on a branch counts as being on the main loop, for laps and places
 function progIdx(o) {
@@ -1541,6 +1569,75 @@ function makeCone(mats) {
   return g;
 }
 
+// Fewer draw calls: bake every still, solid mesh under root into one mesh per material. Things in
+// `moving` (and everything inside them) are left alone, as are see-through and multi-material meshes.
+function mergeStatic(root, moving) {
+  const skip = new Set();
+  for (const m of moving) m.traverse(o => skip.add(o));
+  root.updateMatrixWorld(true);
+  const groups = new Map();
+  root.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || skip.has(o) || Array.isArray(o.material) || o.material.transparent) return;
+    if (!o.geometry.attributes.normal || !o.geometry.attributes.uv) return;
+    if (!groups.has(o.material)) groups.set(o.material, []);
+    groups.get(o.material).push(o);
+  });
+  for (const [mat, list] of groups) {
+    if (list.length < 2) continue;
+    const parts = list.map(o => (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(o.matrixWorld));
+    const count = parts.reduce((s, g) => s + g.attributes.position.count, 0);
+    const pos = new Float32Array(count * 3), nor = new Float32Array(count * 3), uv = new Float32Array(count * 2);
+    let off = 0;
+    for (const g of parts) {
+      pos.set(g.attributes.position.array, off * 3); nor.set(g.attributes.normal.array, off * 3); uv.set(g.attributes.uv.array, off * 2);
+      off += g.attributes.position.count;
+      g.dispose();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    for (const o of list) o.parent.remove(o); // (their geometry was never drawn, and may be shared)
+    root.add(new THREE.Mesh(geo, mat));
+  }
+}
+
+// palm trees, all drawn in one go: a trunk and seven drooping fronds each; spots are [x, z, y?]
+function addPalms(spots, o = {}) {
+  const { scale = [0.8, 1.25], trunk = 0x8a6038, leaf = 0x2f9e57 } = o;
+  const n = Math.max(1, spots.length);
+  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.35, 0.6, 11.5, 6).translate(0, 5.75, 0), lambert({ color: trunk, flatShading: true }), n);
+  const fronds = [];
+  for (let k = 0; k < 7; k++) {
+    const geo = new THREE.BoxGeometry(1.1, 0.15, 6).translate(0, 0, 3).rotateX(0.5).rotateY(k / 7 * TAU).translate(0, 11.4, 0);
+    fronds.push(new THREE.InstancedMesh(geo, lambert({ color: leaf, flatShading: true }), n));
+  }
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  spots.forEach(([x, z, y = 0], i) => {
+    const s = rand(scale[0], scale[1]);
+    q.setFromEuler(e.set(rand(-0.08, 0.08), rand(0, TAU), rand(-0.08, 0.08)));
+    m.compose(new V3(x, y, z), q, new V3(s, s, s));
+    trunks.setMatrixAt(i, m);
+    for (const f of fronds) f.setMatrixAt(i, m);
+  });
+  levelGroup.add(trunks, ...fronds);
+}
+// spots beside a road: every `step` world units on both sides, `out` beyond the barrier (+ jitter);
+// skips spots too close to any road
+function roadside(E, P, step, out, jitter = 0, i0 = 0, i1 = P.n - 1) {
+  const res = [], st = Math.max(1, Math.round(step / P.seg));
+  if (P.loop && i1 < i0) i1 += N; // the stretch runs over the start line
+  for (let i = i0; i <= i1; i += st) {
+    const j = P.loop ? wi(i) : i;
+    for (const side of [-1, 1]) {
+      const lat = side * ((side > 0 ? P.wR[j] : P.wL[j]) + out + rand(0, jitter));
+      const x = P.P[j].x + P.S[j].x * lat, z = P.P[j].z + P.S[j].z * lat;
+      if (!E.nearTrack(x, z, Math.abs(lat) - 1)) res.push([x, z, P.P[j].y, pathHeading(P, j), side, j]);
+    }
+  }
+  return res;
+}
+
 function decoDanfo(E) {
   const sc = L.scale;
   const at = (x, z) => nearestOn(MAIN, x * sc, z * sc, 0, N - 1).i;
@@ -1818,10 +1915,216 @@ function decoDanfo(E) {
   addClouds(E, 12);
 
   return {
+    moving: [...traffic.map(o => o.mesh), ...canoes.map(c => c.c)],
     update(dt, t) {
       const tt = state === 'race' ? raceTime : state === 'countdown' ? 0 : t;
       for (const o of traffic) { o.i = (o.i0 + o.speed * tt / SEG) % N; placeObstacle(o); }
       for (const c of canoes) { c.c.position.y = 0.3 + Math.sin(t * 1.3 + c.ph) * 0.15; c.c.rotation.z = Math.sin(t + c.ph) * 0.05; }
+    },
+  };
+}
+
+function makeTruck(mats) {
+  const g = new THREE.Group();
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.8, 2.6, 2.6), mats.cab);
+  cab.position.set(0, 1.9, 3.4);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1, 0.1), mats.glass);
+  glass.position.set(0, 2.5, 4.72);
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.5, 6.6), mats.dark);
+  bed.position.set(0, 0.95, -1);
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 6, 14).rotateX(Math.PI / 2), mats.tank);
+  tank.position.set(0, 2.55, -1.1);
+  const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 0.4), mats.lamp);
+  lamp.position.set(0, 3.35, 3.4);
+  g.add(cab, glass, bed, tank, lamp);
+  for (const [x, z] of [[-1.3, 3.3], [1.3, 3.3], [-1.3, -1.6], [1.3, -1.6], [-1.3, -3.2], [1.3, -3.2]]) {
+    const w = new THREE.Mesh(mats.wheelGeo, mats.dark);
+    w.position.set(x, 0.6, z);
+    g.add(w);
+  }
+  return g;
+}
+
+function decoGarden(E) {
+  const sc = L.scale;
+  const at = (x, z) => nearestOn(MAIN, x * sc, z * sc, 0, N - 1).i;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new V3(0, 1, 0), col = new THREE.Color();
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), lambert({ map: canvasTex(PAINT.gravel('#4f9a45', ['#3f8a3a', '#62ad52', '#458f3e', '#6fb85a']), 220, 220) }));
+  grass.rotation.x = -Math.PI / 2; grass.position.set(E.cx, -0.08, E.cz);
+  levelGroup.add(grass);
+
+  // the river along the west and south sides, and the creek under the bridge
+  const waterMat = new THREE.MeshPhongMaterial({ color: 0x2b86a0, specular: 0xbfeaff, shininess: 70 });
+  const riverW = 280 * sc, riverS = -112 * sc;
+  const west = new THREE.Mesh(new THREE.PlaneGeometry(900, 3400), waterMat);
+  west.rotation.x = -Math.PI / 2; west.position.set(-riverW - 450, 0.04, E.cz);
+  const south = new THREE.Mesh(new THREE.PlaneGeometry(3400, 900), waterMat);
+  south.rotation.x = -Math.PI / 2; south.position.set(E.cx, 0.04, riverS - 450);
+  const creek = new THREE.Mesh(new THREE.PlaneGeometry(40 * sc, 700), waterMat);
+  creek.rotation.x = -Math.PI / 2; creek.position.set(45 * sc, 0.05, 252 * sc + 230);
+  levelGroup.add(west, south, creek);
+  const wet = (x, z) => x < -riverW + 8 || z < riverS + 8 || (Math.abs(x - 45 * sc) < 24 * sc && z > 252 * sc - 120);
+  // a concrete river wall along the banks
+  const bankMat = lambert({ color: 0x9a968c });
+  const bankW = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3400), bankMat); bankW.position.set(-riverW + 1.5, 0.5, E.cz);
+  const bankS = new THREE.Mesh(new THREE.BoxGeometry(3400, 3, 3), bankMat); bankS.position.set(E.cx, 0.5, riverS + 1.5);
+  levelGroup.add(bankW, bankS);
+
+  // tree-lined boulevard: palms and broad trees alternating, both sides of the start straight
+  const blvd = roadside(E, MAIN, 18, 5, 0, at(-100, -10), at(140, 8)).filter(s => !wet(s[0], s[1]));
+  addPalms(blvd.filter((s, n) => n % 4 < 2).map(s => [s[0], s[1]]));
+  addTrees(blvd.filter((s, n) => n % 4 >= 2), { roundP: 1, hue: [0.25, 0.33], lig: [0.25, 0.35], scale: [1.2, 1.6] });
+  // lush planting everywhere else on dry land
+  const dry = E.spots(260, WALL + 8, 220).filter(([x, z]) => !wet(x, z));
+  addTrees(dry.slice(0, 170), { roundP: 0.85, hue: [0.24, 0.34], sat: [0.5, 0.7], lig: [0.24, 0.38], scale: [1, 1.8] });
+  addPalms(dry.slice(170).map(s => [s[0], s[1]]));
+
+  // open drains along the boulevard and residential streets
+  const drainMat = lambert({ map: canvasTex(PAINT.drain()) });
+  const d0 = at(-100, -10), dLen = wi(at(175, 245) - d0);
+  const dOn = j => TP[j].y < 0.3 && wi(j - d0) <= dLen;
+  ribbon(j => dOn(j) ? -wallL[j] - 3.6 : -wallL[j] - 1, j => -wallL[j] - 1, 0.03, 0.03, 4, drainMat);
+  ribbon(j => wallR[j] + 1, j => dOn(j) ? wallR[j] + 3.6 : wallR[j] + 1, 0.03, 0.03, 4, drainMat);
+
+  // the residential district: bungalows with tin roofs among the trees
+  const homes = roadside(E, MAIN, 30, 12, 8, at(150, 15), at(185, 245)).filter(s => !wet(s[0], s[1]) && s[2] < 0.5);
+  const houseMat = lambert({ map: canvasTex(PAINT.windows(1, false)) });
+  const bodies = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), houseMat, Math.max(1, homes.length));
+  const roofs = new THREE.InstancedMesh(new THREE.ConeGeometry(0.75, 0.5, 4).rotateY(Math.PI / 4).translate(0, 0.25, 0), lambert({ color: 0xffffff, flatShading: true }), Math.max(1, homes.length));
+  const tints = [0xFFF4E0, 0xF6E3B4, 0xD9F0E0, 0xF8D4C8, 0xDDE8F6];
+  const roofCols = [0xB8452E, 0x2E6B8F, 0x3F7F45, 0x8A8F96, 0xB86A2E];
+  homes.forEach(([x, z, , h], n) => {
+    const w = rand(10, 14), d = rand(9, 12), ht = rand(4.5, 6);
+    q.setFromAxisAngle(up, h);
+    bodies.setMatrixAt(n, m.compose(new V3(x, 0, z), q, new V3(d, ht, w)));
+    bodies.setColorAt(n, col.setHex(tints[n % tints.length]));
+    roofs.setMatrixAt(n, m.compose(new V3(x, ht, z), q, new V3(d * 1.45, 6, w * 1.45)));
+    roofs.setColorAt(n, col.setHex(roofCols[(n * 7) % roofCols.length]));
+  });
+  levelGroup.add(bodies, roofs);
+
+  // orange steel arches over the narrow creek bridge
+  const archMat = lambert({ color: 0xE8762A });
+  const b0 = at(95, 252), b1 = at(0, 253);
+  for (let k = 0; k < 4; k++) {
+    const j = wi(b0 + Math.round(wi(b1 - b0) * (k + 0.5) / 4));
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(wallR[j] + 0.3, 0.45, 6, 24, Math.PI), archMat);
+    placeOnTrack(arch, j, 0); // the arc stands across the road
+    levelGroup.add(arch);
+  }
+
+  // the industrial waterfront: storage tanks, warehouses, cranes and a distant gas flare
+  const tankSpots = E.spots(14, WALL + 26, 60, (x, z) => !wet(x, z) && x < -40 * sc && z > -60 * sc);
+  const tankMat = lambert({ map: canvasTex(PAINT.bands('#E8E6E0', '#E8762A', 8), 1, 1) });
+  for (const [x, z] of tankSpots) {
+    const r = rand(8, 13), h = rand(9, 15);
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 18), tankMat);
+    t.position.set(x, h / 2, z);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.6, r, 1.6, 18), lambert({ color: 0xcfcbc2 }));
+    lid.position.set(x, h + 0.8, z);
+    levelGroup.add(t, lid);
+  }
+  const shedMat = lambert({ map: canvasTex(PAINT.corrugated('#7f97a8', '#6b8293'), 6, 1) });
+  const sheds = roadside(E, MAIN, 46, 17, 6, at(-75, 262), at(-205, 135)).filter(s => !wet(s[0], s[1]));
+  for (const [x, z, , h] of sheds) {
+    const s = new THREE.Mesh(new THREE.BoxGeometry(rand(16, 22), rand(7, 10), rand(28, 40)), shedMat);
+    s.position.set(x, s.geometry.parameters.height / 2, z); s.rotation.y = h;
+    levelGroup.add(s);
+  }
+  const craneMat = lambert({ color: 0xE8762A }), craneDark = lambert({ color: 0x3a3f4a });
+  for (let k = 0; k < 4; k++) {
+    const g = new THREE.Group();
+    for (const [x, z] of [[-5, -4], [5, -4], [-5, 4], [5, 4]]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(1, 26, 1), craneMat); leg.position.set(x, 13, z); g.add(leg);
+    }
+    const top = new THREE.Mesh(new THREE.BoxGeometry(12, 3, 9), craneMat); top.position.y = 27;
+    const boom = new THREE.Mesh(new THREE.BoxGeometry(2, 1.6, 48), craneDark); boom.position.set(0, 28, -14);
+    g.add(top, boom);
+    g.position.set(-riverW + 6, 0, 120 * sc + k * 60);
+    g.rotation.y = -Math.PI / 2;
+    levelGroup.add(g);
+  }
+  const flare = new THREE.Group();
+  const stack = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 2, 70, 8), craneDark); stack.position.y = 35;
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(3.5, 12, 8), new THREE.MeshBasicMaterial({ color: 0xFF8A1F, fog: false }));
+  flame.position.y = 76;
+  flare.add(stack, flame);
+  flare.position.set(-riverW - 380, 0, 330 * sc);
+  levelGroup.add(flare);
+  // a moored ship and boats on the river; the far bank's skyline
+  const ship = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(14, 6, 80), lambert({ color: 0x1B4F8A })); hull.position.y = 2;
+  const deckhouse = new THREE.Mesh(new THREE.BoxGeometry(12, 9, 10), lambert({ color: 0xF4F1EA })); deckhouse.position.set(0, 9.5, -30);
+  ship.add(hull, deckhouse);
+  const boxCols = [0xE8363C, 0x2EC27E, 0xFFC21F, 0x2D6BFF, 0xE8762A];
+  for (let k = 0; k < 10; k++) { const c = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 9), lambert({ color: boxCols[k % 5] })); c.position.set((k % 2) * 5.5 - 2.75, 6.5 + (k % 3 === 0 ? 3 : 0), -18 + Math.floor(k / 2) * 9.5); ship.add(c); }
+  ship.position.set(-riverW - 22, 0, 160 * sc);
+  levelGroup.add(ship);
+  const boats = [];
+  for (let k = 0; k < 5; k++) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1, 8), lambert({ color: [0xffffff, 0xE8762A, 0x2D6BFF][k % 3] }));
+    levelGroup.add(b);
+    boats.push({ b, k, ph: rand(0, TAU), sp: rand(0.02, 0.05) });
+  }
+  const far = [0x9fb0bf, 0x8a9db0, 0xb3c1cd].map(c => lambert({ color: c, fog: false }));
+  for (let k = 0; k < 30; k++) {
+    const h = rand(25, 90), w = rand(14, 30);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), far[k % 3]);
+    const a = rand(-0.6, 0.9);
+    b.position.set(E.cx + Math.cos(a) * 1050, h / 2, E.cz + Math.sin(a) * 1050);
+    levelGroup.add(b);
+  }
+
+  // ---- things on the road
+  const truckMats = { cab: lambert({ color: 0xE8762A }), glass: lambert({ color: 0x2B3A4A }), dark: lambert({ color: 0x22222a }),
+    tank: lambert({ color: 0xDCDAD4 }), lamp: new THREE.MeshBasicMaterial({ color: 0xFFB020 }),
+    wheelGeo: new THREE.CylinderGeometry(0.6, 0.6, 0.5, 10).rotateZ(Math.PI / 2) };
+  // slow industrial service trucks doing laps, with flashing amber roof lamps
+  const trucks = [0.15, 0.48, 0.8].map((f, n) => {
+    const mesh = makeTruck(truckMats);
+    levelGroup.add(mesh);
+    return addObstacle({ i: f * N, i0: f * N, lat: n % 2 ? 6.5 : -6.5, len: 9.4, w: 3, kind: 'traffic', speed: 11, mesh });
+  });
+  // puddles on the wet sections
+  const puddleMat = new THREE.MeshBasicMaterial({ map: canvasTex(PAINT.puddle()), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+  const puddle = (path, i, lat) => {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(5, 7).rotateX(-Math.PI / 2), puddleMat);
+    mesh.position.y = 0.05;
+    levelGroup.add(mesh);
+    addObstacle({ path, i, lat, len: 6, w: 4, kind: 'puddle', mesh });
+  };
+  puddle(MAIN, at(-110, 254), 4); puddle(MAIN, at(-168, 222), -5); puddle(MAIN, at(-170, -72), 3); puddle(MAIN, at(-120, -63), -4);
+  for (const B of BRANCHES) { puddle(B, Math.round(B.n * 0.38), 1.5); puddle(B, Math.round(B.n * 0.68), -1.5); }
+  // steam vents beside the industrial bends: they puff a cloud across the road every few seconds
+  const vents = [[-120, 250], [-195, 165]].map(([x, z]) => {
+    const i = at(x, z), side = 1, lat = side * (wallR[i] + 2);
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 4, 10), craneDark);
+    placeOnTrack(pipe, i, lat, 2);
+    levelGroup.add(pipe);
+    return { i, side, x: pipe.position.x, z: pipe.position.z };
+  });
+
+  addClouds(E, 16, { emissive: 0xa8b4c0 });
+
+  return {
+    moving: [...trucks.map(o => o.mesh), ...boats.map(b => b.b), flame],
+    update(dt, t) {
+      const tt = state === 'race' ? raceTime : state === 'countdown' ? 0 : t;
+      for (const o of trucks) { o.i = (o.i0 + o.speed * tt / SEG) % N; placeObstacle(o); }
+      truckMats.lamp.color.setHex(Math.sin(t * 8) > 0 ? 0xFFB020 : 0x5a3a10);
+      flame.scale.set(1 + Math.sin(t * 9) * 0.12, 1 + Math.sin(t * 6.3) * 0.18, 1);
+      for (const b of boats) {
+        const a = t * b.sp + b.ph, x = -riverW - 90 - b.k * 40, z = E.cz + Math.sin(a) * 600;
+        b.b.position.set(x, 0.4, z); b.b.rotation.y = Math.cos(a) > 0 ? 0 : Math.PI;
+      }
+      // each vent blows for 1.6 s out of every 4 s, drifting across the road
+      for (const v of vents) {
+        const ph = (t + v.i * 0.01) % 4;
+        if (ph < 1.6 && Math.random() < 0.6) {
+          const s = TS[v.i];
+          emit(dust, v.x, 4.5, v.z, -s.x * v.side * rand(5, 9), rand(0.5, 1.5), -s.z * v.side * rand(5, 9), 0xf2f4f6, 3.2, 7, -0.3);
+        }
+      }
     },
   };
 }
@@ -1840,6 +2143,23 @@ const LEVELS = [
     arch: { post: 0x1B1330, bg: '#1B1330', text: '#FFC21F', stripe: '#2EC27E' },
     shoulder: () => PAINT.pavement(), slab: 0xc9c1b2, base: 'flyover', deco: decoDanfo, dust: 0xb8ab98, theme: 4,
     pads: [[0.06, 0], [0.55, -4], [0.72, 4], [0.95, 0]], boxes: [0.16, 0.53, 0.78],
+  },
+  {
+    name: 'Garden City Grand Prix', tag: 'Port Harcourt · Waterfront', band: 'linear-gradient(180deg,#5aa0e0 0 45%,#2EC27E 45% 75%,#2b86a0 75%)',
+    scale: 1.5, groundY: 0,
+    cp: [[-60, 0, 0], [40, 0, 0], [120, 5, 0], [185, 35, 0], [215, 95, 0], [190, 150, 0], [215, 200, 0], [175, 245, 0],
+      [120, 252, 2], [70, 252, 6], [20, 252, 6], [-25, 254, 2], [-75, 262, 0], [-140, 240, 0], [-185, 195, 0], [-205, 135, 0],
+      [-140, 95, 0], [-115, 35, 0], [-160, -15, 0], [-215, -50, 0], [-160, -75, 0], [-110, -55, 0], [-75, -20, 0]],
+    // the riverside service road: cuts off the long inland bend, but it's narrow and slippery
+    branches: [{ from: [-203, 138], to: [-213, -48], cp: [[-235, 100], [-245, 45], [-240, -10]], half: 4.5, wet: true, ai: 0.35 }],
+    branchLook: { road: ['#5d6068', 'rgba(255,255,255,0.5)', 'rgba(0,0,0,0)'], wall: ['#F4F6FF', '#E8762A', '#1B1330'], shoulder: () => PAINT.pavement('#a9a397', '#8f897d') },
+    narrow: [{ from: [95, 252], to: [0, 253], wall: 8.5 }],
+    wet: [[[-75, 262], [-190, 185]], [[-215, -50], [-100, -50]]], wetGrip: 0.4,
+    sky: [0x5aa0e0, 0xd9ecf2], fog: [240, 850], hemi: [0xeaf6ff, 0x3f7f45, 0.95], sun: [0xfff3dc, 0.72],
+    road: ['#4a4e57', '#FFFFFF', 'rgba(255,210,63,0.6)'], curb: ['#E8762A', '#FFFFFF'], wall: ['#F4F6FF', '#2EC27E', '#1B1330'],
+    arch: { post: 0x0f5a3a, bg: '#0f5a3a', text: '#FFFFFF', stripe: '#E8762A' },
+    shoulder: () => PAINT.pavement('#c4c0b4', '#a8a497'), slab: 0xc9c5ba, base: 'flyover', deco: decoGarden, dust: 0x6a8a50, theme: 5,
+    pads: [[0.07, 0], [0.33, 0], [0.63, -4], [0.95, 0]], boxes: [0.2, 0.5, 0.86],
   },
   {
     name: 'Pepper Hill', tag: 'Rolling green hills', band: 'linear-gradient(180deg,#8FD3F5 0 55%,#62B84A 55%)',
@@ -1906,6 +2226,7 @@ function buildLevel(li) {
     const p = curve.getPointAt(t);
     const tg = curve.getTangentAt(t);
     const h = new V3(tg.x, 0, tg.z).normalize();
+    if (L.base === 'flyover') p.y = Math.max(0, p.y); // the curve can dip below a ramp's foot: keep it out of the ground
     TP.push(p); TT.push(h); TS.push(new V3(-h.z, 0, h.x));
   }
   SEG = curve.getLength() / N;
@@ -1934,6 +2255,19 @@ function buildLevel(li) {
   }
   tunnel = L.tunnel ? { i0: Math.floor(L.tunnel[0] * N), i1: Math.floor(L.tunnel[1] * N) } : null;
   MAIN = { id: 0, P: TP, T: TT, S: TS, n: N, loop: true, half: HALF, wL: wallL, wR: wallR, slope: SLOPE, seg: SEG };
+  const near = ([x, z]) => nearestOn(MAIN, x * L.scale, z * L.scale, 0, N - 1).i;
+  // narrow sections (bridges): barriers pulled in to `wall`, easing back out over 25 samples each end
+  for (const nr of L.narrow || []) {
+    const i0 = near(nr.from), len = wi(near(nr.to) - i0), ease = 25;
+    for (let d = -ease; d <= len + ease; d++) {
+      const j = wi(i0 + d), t = d < 0 ? -d / ease : d > len ? (d - len) / ease : 0;
+      const w = nr.wall + (WALL - nr.wall) * t * t * (3 - 2 * t);
+      wallL[j] = Math.min(wallL[j], w); wallR[j] = Math.min(wallR[j], w);
+    }
+  }
+  // wet sections: less grip (see updateKart)
+  WET = new Uint8Array(N);
+  for (const [from, to] of L.wet || []) { const i0 = near(from), len = wi(near(to) - i0); for (let d = 0; d <= len; d++) WET[wi(i0 + d)] = 1; }
   BRANCHES = (L.branches || []).map((def, n) => buildBranch(def, n + 1));
   PATHS = [MAIN, ...BRANCHES];
   OBST = [];
@@ -1951,14 +2285,21 @@ function buildLevel(li) {
   }
 
   // surfaces
-  ribbon(-HALF, HALF, 0, 0, ROAD_W, lambert({ map: canvasTex(PAINT.road(...L.road)) }));
+  // the tarmac, kerbs and verge, trimmed to fit between the barriers where they're pulled in
+  const inL = (j, w) => -Math.min(w, wallL[j]), inR = (j, w) => Math.min(w, wallR[j]);
+  ribbon(j => inL(j, HALF), j => inR(j, HALF), 0, 0, ROAD_W, lambert({ map: canvasTex(PAINT.road(...L.road)) }));
   const curbMat = lambert({ map: canvasTex(PAINT.stripe(L.curb[0], L.curb[1])) });
-  ribbon(-HALF - 1.6, -HALF, 0.015, 0.015, 3, curbMat);
-  ribbon(HALF, HALF + 1.6, 0.015, 0.015, 3, curbMat);
+  ribbon(j => inL(j, HALF + 1.6), j => inL(j, HALF), 0.015, 0.015, 3, curbMat);
+  ribbon(j => inR(j, HALF), j => inR(j, HALF + 1.6), 0.015, 0.015, 3, curbMat);
   if (L.shoulder) {
     const sh = lambert({ map: canvasTex(L.shoulder()) });
-    ribbon(j => -wallL[j], -HALF - 1.6, -0.01, -0.01, 8, sh);
-    ribbon(HALF + 1.6, j => wallR[j], -0.01, -0.01, 8, sh);
+    ribbon(j => -wallL[j], j => inL(j, HALF + 1.6), -0.01, -0.01, 8, sh);
+    ribbon(j => inR(j, HALF + 1.6), j => wallR[j], -0.01, -0.01, 8, sh);
+  }
+  if (L.wet) {
+    // a glossy wet sheen over the wet sections
+    const sheen = new THREE.MeshPhongMaterial({ map: canvasTex(PAINT.puddles()), color: 0x8fb4d0, specular: 0xdfefff, shininess: 80, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    ribbon(j => WET[j] ? inL(j, HALF) : 0, j => WET[j] ? inR(j, HALF) : 0, 0.02, 0.02, ROAD_W, sheen);
   }
   const wallMat = lambert({ map: canvasTex(PAINT.stripe(...L.wall)), side: THREE.DoubleSide });
   ribbon(j => -wallL[j], j => -wallL[j], 0, j => hideL[j] ? 0 : 1.3, 4, wallMat);
@@ -1967,6 +2308,7 @@ function buildLevel(li) {
   for (const B of BRANCHES) {
     const over = { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 };
     ribbon(-B.half, B.half, 0.02, 0.02, B.half * 2, lambert({ map: canvasTex(PAINT.road(...(BL.road || L.road))), ...over }), levelGroup, B);
+    if (B.wet) ribbon(-B.half, B.half, 0.04, 0.04, B.half * 2, new THREE.MeshPhongMaterial({ map: canvasTex(PAINT.puddles()), color: 0x8fb4d0, specular: 0xdfefff, shininess: 80, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }), levelGroup, B);
     const sh = lambert({ map: canvasTex(BL.shoulder ? BL.shoulder() : PAINT.gravel('#8a7a66', ['#7a6a56', '#9a8a76'])), ...over });
     ribbon(j => -B.wL[j], -B.half, 0.01, 0.01, 6, sh, levelGroup, B);
     ribbon(B.half, j => B.wR[j], 0.01, 0.01, 6, sh, levelGroup, B);
@@ -2012,6 +2354,7 @@ function buildLevel(li) {
 
   const E = makeEnv();
   levelHooks = L.deco(E) || {};
+  if (levelHooks.moving) mergeStatic(levelGroup, [...levelHooks.moving, ...boxes.map(b => b.g)]);
   drawMinimapBase();
 }
 
@@ -2063,7 +2406,7 @@ function buildBranch(def, id) {
     const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1);
     slope[i] = (P[i1].y - P[i0].y) / ((i1 - i0) * seg);
   }
-  const B = { id, P, T, S, n, loop: false, half, wL: wLb, wR: wRb, slope, seg, a, b, sa, ai: def.ai ?? 0.35 };
+  const B = { id, P, T, S, n, loop: false, half, wL: wLb, wR: wRb, slope, seg, a, b, sa, ai: def.ai ?? 0.35, wet: !!def.wet };
   const onMain = i => nearestOn(MAIN, P[i].x, P[i].z, a - 150, b + 150);
   // the mouths: the first and last samples whose lane still overlaps the main road and its barriers
   const overlaps = i => Math.abs(onMain(i).lat) < WALL + half;
@@ -2100,7 +2443,7 @@ function switchPath(o) {
       for (const [win, j0, j1] of [[B.winA, 0, B.mouthA], [B.winB, B.mouthB, B.n - 1]]) {
         if (!inWin(o.idx, win)) continue;
         const q = nearestOn(B, o.pos.x, o.pos.z, j0, j1);
-        if (!q.inside || Math.abs(q.lat) > B.half + 1.2) continue;
+        if (!q.inside || Math.abs(q.lat) > B.half + 0.5) continue; // (leaving needs +1.5: no flicking between roads)
         o.path = B; o.idx = q.i; o.lat = q.lat;
         return;
       }
@@ -2112,7 +2455,7 @@ function switchPath(o) {
     const c = nearA ? B.a : B.b;
     const q = nearestOn(MAIN, o.pos.x, o.pos.z, c - 40, c + 40);
     // back on the main road's tarmac, out through a side of the branch with no wall, or off either end
-    const outSide = Math.abs(o.lat) > B.half + 1 && (o.lat > 0 ? B.hideR : B.hideL)[o.idx];
+    const outSide = Math.abs(o.lat) > B.half + 1.5 && (o.lat > 0 ? B.hideR : B.hideL)[o.idx];
     if (Math.abs(q.lat) < HALF - 0.5 || outSide || o.idx === 0 || o.idx === B.n - 1) { o.path = MAIN; o.idx = q.i; o.lat = q.lat; }
   }
 }
@@ -2462,6 +2805,15 @@ const THEMES = [
     drums: { kick: 'x..x....x..x..x.', clap: '....x.......x...', shaker: 'x.xxx.xxx.xxx.xx', bell: 'x.x.xx.x.x.xx.x.', tom: '..h..m....h.m.l.' },
     amb: 'city',
   },
+  { // 5 Garden City Grand Prix: breezy highlife, bright guitar over a walking bass
+    bpm: 124, scale: 'major', leadBase: 72, bassBase: 43, arpBase: 67, chords: [0, 4, 0, 3, 0, 4, 3, 4],
+    lead: ['4.5.4.2.0...2.4.', '6.5.4.2.1...4...', '4.5.7.5.4.2.0...', '3.2.0.2.3.4.5...',
+      '7...7.5.4.5.7...', '6.4.1.4.6...4...', '5.4.3.2.3.5.7.5.', '4.2.1.2.0-------'],
+    leadVoice: 'steel', leadVol: 0.09, bass: 'R.5.R.5.R.5.O.5.', bassVoice: 'triBass', bassVol: 0.14,
+    arp: '.0.2.4.2.0.2.4.2', arpVoice: 'pluck', arpVol: 0.04,
+    drums: { kick: 'x.......x.x.....', clap: '....x.......x...', shaker: 'xxxxxxxxxxxxxxxx', bell: 'x..x..x...x..x..' },
+    amb: 'waterfront',
+  },
 ];
 
 function playStep(th, s, t, sd) {
@@ -2540,6 +2892,16 @@ function startAmbience(kind) {
     tick = t => {
       if (Math.random() < 0.08) noiseHit(t, 'highpass', 3000, rand(0.015, 0.045), 0.02, ambBus);
       if (Math.random() < 0.004) noiseHit(t, 'lowpass', 90, 0.45, 1.8, ambBus, brownBuf);
+    };
+  } else if (kind === 'waterfront') {
+    // lapping water, birds in the trees, now and then a ship's horn or a clank from the yard
+    const f = filt('lowpass', 480), g = gain(0.06);
+    loop(noiseBuf).connect(f); f.connect(g); g.connect(ambBus);
+    lfo(0.16, 0.035, g.gain);
+    tick = t => {
+      if (Math.random() < 0.01) { const base = rand(2400, 3800); for (let k = 0; k < 3; k++) blip(t + k * 0.1, 'sine', base, base * 1.3, 0.07, 0.03); }
+      if (Math.random() < 0.0012) { blip(t, 'sawtooth', 92, 90, 2.4, 0.03); blip(t, 'sawtooth', 138, 136, 2.4, 0.02); }
+      if (Math.random() < 0.003) noiseHit(t, 'bandpass', 2200, 0.05, 0.12, ambBus);
     };
   } else if (kind === 'city') {
     // traffic rumble and street hiss, with car horns now and then
@@ -2779,7 +3141,7 @@ function buildGrid(spec) {
       drift: { active: false, dir: 0, charge: 0, tier: 0 },
       boost: 0, spin: 0, hopT: 0, item: null, pending: null, rolling: 0,
       finished: false, place: 0, time: 0, steerVis: 0, visYaw: 0, pitch: 0, rubber: 1,
-      skill: ctrl === 'cpu' ? skills[Math.min(slot, 4)] * CLASSES[cls].ai : 1, wallT: 0, wrongT: 0, path: MAIN, holeT: 0,
+      skill: ctrl === 'cpu' ? skills[Math.min(slot, 4)] * CLASSES[cls].ai : 1, wallT: 0, wrongT: 0, path: MAIN, holeT: 0, slickT: 0,
       ai: { t: rand(0, 10), lane: rand(-5, 5), wf: rand(0.25, 0.5), ph: rand(0, TAU), stuck: 0, itemT: 2 },
     };
     k.mesh.group.position.copy(k.pos);
@@ -2806,7 +3168,7 @@ function giveBoost(k, t, kind) {
 // so every computer in an online race sees the same traffic without sending anything.
 function addObstacle(o) {
   o = Object.assign({ path: MAIN, len: 4, w: 2.4, kind: 'parked', speed: 0, y: 0 }, o);
-  o.solid = o.kind !== 'hole';
+  o.solid = o.kind !== 'hole' && o.kind !== 'puddle';
   o.x = 0; o.z = 0; o.fx = 0; o.fz = 1;
   placeObstacle(o);
   OBST.push(o);
@@ -2841,6 +3203,15 @@ function collideObstacles(k, dt) {
     const hit = obstacleOverlap(o, k.pos, 1.15);
     if (!hit) continue;
     const [ax, lx, pa, pl] = hit;
+    if (o.kind === 'puddle') {
+      if (k.slickT <= -0.5 && Math.abs(k.speed) > 8) {
+        k.slickT = 0.6; k.speed *= 0.9;
+        const n = k === player || k.pos.distanceToSquared(camera.position) < 60 * 60 ? 16 : 0;
+        for (let q = 0; q < n; q++) emit(dust, k.pos.x + rand(-1.5, 1.5), k.pos.y + 0.4, k.pos.z + rand(-1.5, 1.5), rand(-4, 4), rand(3, 7), rand(-4, 4), 0xdff0ff, 0.7, 1.6, 12);
+        if (k === player) { noise(0.35, 0.18, 2200); toast('Splash!', 'warn', 600); }
+      }
+      continue;
+    }
     if (o.kind === 'hole') {
       if (k.holeT <= 0 && Math.abs(k.speed) > 8) {
         k.holeT = 0.9; k.speed *= 0.62; k.hopT = 0.28; k.drift.active = false;
@@ -2895,7 +3266,15 @@ function respawn(k) {
     }
   }
   k.idx = i; k.lat = lat;
-  k.h = pathHeading(P, i); k.speed = 0; k.spin = 0; k.drift.active = false;
+  k.h = k.vh = pathHeading(P, i); k.speed = 0; k.spin = 0; k.slickT = 0; k.drift.active = false;
+}
+
+// how well the tyres hold: 1 on dry tarmac, less on wet road or just after a puddle
+function gripOf(k) {
+  let g = 1;
+  if (k.path.wet || (k.path === MAIN && WET[k.idx])) g = L.wetGrip || 0.4;
+  if (k.slickT > 0) g = Math.min(g, 0.22);
+  return g;
 }
 
 function slopeAlong(k) {
@@ -2952,9 +3331,14 @@ function updateKart(k, inp, dt) {
   k.h = wrapA(k.h + turn * dt);
   k.steerVis = lerp(k.steerVis, steer, 1 - Math.exp(-12 * dt));
 
-  // move
-  k.pos.x += Math.sin(k.h) * k.speed * dt;
-  k.pos.z += Math.cos(k.h) * k.speed * dt;
+  // move. On a wet road the direction of travel (vh) trails the way the kart points, so it slides
+  // wide through corners; on dry tarmac it goes exactly where it points.
+  const grip = gripOf(k);
+  if (grip >= 1 || k.vh === undefined) k.vh = k.h;
+  else k.vh = wrapA(k.vh + wrapA(k.h - k.vh) * Math.min(1, dt * 16 * grip));
+  k.slickT -= dt;
+  k.pos.x += Math.sin(k.vh) * k.speed * dt;
+  k.pos.z += Math.cos(k.vh) * k.speed * dt;
   trackLocate(k);
 
   // barriers
@@ -2965,6 +3349,7 @@ function updateKart(k, inp, dt) {
     const th = pathHeading(k.path, k.idx);
     const dh = wrapA(th - k.h);
     k.h = wrapA(k.h + (Math.cos(dh) >= 0 ? dh : wrapA(dh + Math.PI)) * 0.25);
+    k.vh = k.h; // a wall stops a slide
     k.speed -= k.speed * 2.5 * dt;
     if (k === player && Math.abs(k.speed) > 12 && k.wallT <= 0) { sfx.bump(); k.wallT = 0.4; shake = 0.25; }
   }
@@ -3284,7 +3669,8 @@ function aiInput(k, dt) {
     for (const o of obs) if ((hits(lane, o) || hits(k.lat, o)) && (!first || along(o) < along(first))) first = o;
     if (first) {
       const d1 = along(first), group = obs.filter(o => along(o) > d1 - 25 && along(o) < d1 + 25);
-      const lim = P.half - 1.3;
+      const fi = P.loop ? wi(Math.round(first.i)) : clamp(Math.round(first.i), 0, P.n - 1);
+      const lim = Math.min(P.half, P.wL[fi] - 1.1, P.wR[fi] - 1.1) - 1.3;
       let best = null, bd = Infinity;
       const free = c => Math.abs(c) <= lim && !group.some(g => hits(c, g));
       // keep the side already chosen for this obstacle while it stays clear, so it doesn't swerve late
@@ -3303,6 +3689,7 @@ function aiInput(k, dt) {
       } else blocked = d1 < 25;
     }
   }
+  lane = clamp(lane, -Q.wL[i2] + 2.2, Q.wR[i2] - 2.2); // inside the barriers, which narrow on bridges
   const tp = Q.P[i2], ts = Q.S[i2];
   const tx = tp.x + ts.x * lane, tz = tp.z + ts.z * lane;
   const des = Math.atan2(tx - k.pos.x, tz - k.pos.z);
@@ -3519,6 +3906,12 @@ function updateKartVisual(k, dt) {
       m.body.localToWorld(tmpV.set(x, 0.65, -1.85));
       const bx = -Math.sin(k.h) * 8, bz = -Math.cos(k.h) * 8;
       emit(sparks, tmpV.x, tmpV.y, tmpV.z, bx + rand(-1, 1), rand(0, 1.5), bz + rand(-1, 1), Math.random() < 0.5 ? 0xFF8A1F : 0xFFD23F, 0.22, 0.9);
+    }
+  }
+  if (!off && Math.abs(k.speed) > 14 && gripOf(k) < 1 && Math.random() < 0.7) { // spray off a wet road
+    for (const x of [-1.1, 1.1]) {
+      m.body.localToWorld(tmpV.set(x, 0.3, -1.3));
+      emit(dust, tmpV.x, tmpV.y, tmpV.z, rand(-1.5, 1.5) + x, rand(1.5, 3), rand(-1.5, 1.5), 0xe6f2ff, 0.45, 1.1, 6);
     }
   }
   if (off && Math.abs(k.speed) > 8 && Math.random() < 0.6) {

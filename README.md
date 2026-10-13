@@ -17,10 +17,11 @@ A 3D kart racer that runs in the browser. Race five computer rivals over three l
 | # | Track | Setting |
 |---|-------|---------|
 | 1 | Danfo Dash | Lagos streets, markets and a flyover over the lagoon. Yellow danfo buses drive laps in the outer lanes and spin you out if you hit them; parked cars, potholes and roadworks narrow the road. A service lane behind the market stalls is a shortcut, but it's narrow and has parked cars in it |
-| 2 | Pepper Hill | Rolling green hills |
-| 3 | Cloud Nine Skyway | A floating road above the clouds |
-| 4 | Coral Causeway | A bridge over the sea |
-| 5 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
+| 2 | Garden City Grand Prix | Port Harcourt: a tree-lined boulevard, a narrow bridge over a creek, then an industrial waterfront and a riverside run to the finish. The waterfront roads are wet and slippery (karts slide wide), puddles splash you, steam drifts across the road and slow tanker trucks do laps. A riverside service road is a shortcut, but it's narrow and wet all the way |
+| 3 | Pepper Hill | Rolling green hills |
+| 4 | Cloud Nine Skyway | A floating road above the clouds |
+| 5 | Coral Causeway | A bridge over the sea |
+| 6 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
 
 Finish a track in the top 3 to unlock the next one. Progress is saved in your browser, and **Reset progress** on the title screen locks the tracks again.
 
