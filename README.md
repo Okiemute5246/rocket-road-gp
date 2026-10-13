@@ -23,10 +23,11 @@ A 3D kart racer that runs in the browser. Race five computer rivals over three l
 | 5 | Bronze Kingdom | Benin City: a monumental gate, a ceremonial avenue of bronze sculptures, a courtyard district of tight corners between patterned walls, three timed gateways, and a plaza of turning bronze arms and sliding floor plates. Each gateway has two leaves that rise from the road in turn, so one half is always open: lamps go green, then flash amber before a leaf rises, then red. A narrow passage between courtyards cuts the last corner, with a tight exit just before the first gateway |
 | 6 | Plateau Peak Rally | Jos: a highland road that sweeps down into a rocky valley, then climbs three hairpins back to the plateau. Boulders roll across the road at marked crossings on a fixed cycle (lamps flash and a red line pulses first), gravel lines the outside of bends, and two chevron-marked ramps launch you: land pointing down the road or lose speed. A rough hillside cut skips the two sweeping bends and ends in a jump back onto the road |
 | 7 | Olumo Rock Rush | Abeokuta: from a town square, up round a great granite formation, through a natural rock arch and down three switchbacks hemmed in by boulders, then a stone-lined run home. The road edges are raised stone: clip them and you lose speed. Small stones fall in two marked stretches and gravel lines the outside of two hairpins. A lit cave through the rock formation cuts off the big climbing curve |
-| 8 | Pepper Hill | Rolling green hills |
-| 9 | Cloud Nine Skyway | A floating road above the clouds |
-| 10 | Coral Causeway | A bridge over the sea |
-| 11 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
+| 8 | Sacred Grove Sprint | Osogbo: through a forest entrance, under a dense leafy canopy (falling leaves, shafts of light, a closer green haze), over a river bridge and into an open clearing lined with abstract sculptures, then back through the forest. Roots across the road edges jolt you and low branches overhang them. On the bridge, two wooden drawbridge halves (marked by jade lanterns) take turns to tip up, so one half is always open. A narrow woodland path twists through the clearing as a shortcut. The sculptures are fictional forms, set back from the road |
+| 9 | Pepper Hill | Rolling green hills |
+| 10 | Cloud Nine Skyway | A floating road above the clouds |
+| 11 | Coral Causeway | A bridge over the sea |
+| 12 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
 
 Finish a track in the top 3 to unlock the next one. Progress is saved in your browser, and **Reset progress** on the title screen locks the tracks again.
 

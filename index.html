@@ -1745,6 +1745,51 @@ function addRockfall(zones, o = {}) {
   };
 }
 
+// the clock moving things run on: the race clock in a race (so every computer in an online race
+// agrees), frozen at the start during the countdown, and free-running on the title screen
+const raceClock = () => state === 'race' ? raceTime : state === 'countdown' ? 0 : animTime;
+
+// Two leaves across the road at sample i that take turns to block one half each, so one half is always
+// open: each is up for 3.5 s in every 7 (rising over 0.5 s, blocking once it's half up). Each has a
+// lamp: green while down, flashing amber for the 1.5 s before it rises, red while up. make(side, half)
+// builds a leaf's mesh, lift(mesh, h) poses it for height h (0 down .. 1 up), lamp(side) is [lat, y].
+// The computer drivers aim for whichever half will be open when they arrive (see aiInput).
+function addTimedPair(i, phase, { make, lift, lamp }) {
+  const T = 7;
+  const leafH = local => local < 0.5 ? local / 0.5 : local < 3.5 ? 1 : local < 4 ? 1 - (local - 3.5) / 0.5 : 0;
+  const leaves = [-1, 1].map(s => {
+    const half = s > 0 ? wallR[i] : wallL[i]; // each leaf spans its half of the road, middle to barrier
+    const mesh = make(s, half);
+    levelGroup.add(mesh);
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0x2EC27E });
+    const post = new THREE.Group(), bulb = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), lampMat);
+    const [lat, y] = lamp(s);
+    bulb.position.set(0, y, -1.5); // facing oncoming karts
+    post.add(bulb);
+    placeOnTrack(post, i, lat);
+    levelGroup.add(post);
+    const o = addObstacle({ i, lat: s * half / 2, len: 1.6, w: half, kind: 'barrier', mesh, side: s, lampMat });
+    o.height = t => leafH(((t + phase + (s > 0 ? T / 2 : 0)) % T + T) % T);
+    o.heightAt = secs => o.height(raceClock() + secs);
+    o.solidAt = secs => o.heightAt(secs) > 0.5;
+    return o;
+  });
+  leaves[0].pair = leaves[1]; leaves[1].pair = leaves[0];
+  return {
+    i, leaves,
+    update(tt, t) {
+      for (const o of leaves) {
+        const h = o.height(tt);
+        o.on = h > 0.5;
+        lift(o.mesh, h);
+        const warn = !o.on && o.height(tt + 1.5) > 0.5;
+        o.lampMat.color.setHex(o.on ? 0xE8363C : warn ? (Math.sin(t * 14) > 0 ? 0xFFB020 : 0x5a3a10) : 0x2EC27E);
+        if (warn && player && player.path === MAIN && wi(i - player.idx) < 45 && Math.random() < 0.02) tone(220, 0.08, 'square', 0.03);
+      }
+    },
+  };
+}
+
 // palm trees, all drawn in one go: a trunk and seven drooping fronds each; spots are [x, z, y?]
 function addPalms(spots, o = {}) {
   const { scale = [0.8, 1.25], trunk = 0x8a6038, leaf = 0x2f9e57 } = o;
@@ -2655,11 +2700,8 @@ function decoBronze(E) {
   });
   levelGroup.add(hb, hr);
 
-  // ---- timed gates: three decorative gateways, each with two bronze leaves that rise from the road.
-  // One half is always open; the leaves swap every 3.5 s. Lamps: green open, flashing amber for the
-  // 1.5 s before a leaf rises, red while it's up. A leaf only blocks once it's more than half up.
-  const T = 7;
-  const leafH = (local) => local < 0.5 ? local / 0.5 : local < 3.5 ? 1 : local < 4 ? 1 - (local - 3.5) / 0.5 : 0;
+  // ---- timed gates: three decorative gateways, each with two bronze leaves that rise from the road
+  // in turn (see addTimedPair)
   const leafPanel = lambert({ map: canvasTex(makeCanvas(128, 64, (g, w, h) => {
     g.fillStyle = '#9A5E2E'; g.fillRect(0, 0, w, h);
     g.strokeStyle = '#D4A017'; g.lineWidth = 3; g.strokeRect(4, 4, w - 8, h - 8);
@@ -2678,27 +2720,16 @@ function decoBronze(E) {
     arch.add(beam, crest);
     placeOnTrack(arch, i, (wallR[i] - wallL[i]) / 2);
     levelGroup.add(arch);
-    const leaves = [-1, 1].map(s => {
-      const g = new THREE.Group();
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(HALF - 0.3, 3, 1.2), leafPanel); panel.position.y = 1.5;
-      const lampMat = new THREE.MeshBasicMaterial({ color: 0x2EC27E });
-      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), lampMat);
-      g.add(panel);
-      const post = new THREE.Group(); post.add(lamp); lamp.position.set(0, 8.5, -1.5); // on the pillar, facing oncoming karts
-      placeOnTrack(post, i, s * (w / 2 + 1.2)); levelGroup.add(post);
-      levelGroup.add(g);
-      const half = (s > 0 ? wallR[i] : wallL[i]); // each leaf spans its half of the road, kerb to barrier
-      const o = addObstacle({ i, lat: s * half / 2, len: 1.6, w: half, kind: 'barrier', mesh: g, side: s, lampMat });
-      panel.scale.x = half / (HALF - 0.3);
-      o.height = t => leafH(((t + phase + (s > 0 ? T / 2 : 0)) % T + T) % T);
-      o.heightAt = secs => o.height(gateClock() + secs);
-      o.solidAt = secs => o.heightAt(secs) > 0.5;
-      return o;
+    return addTimedPair(i, phase, {
+      make: (s, half) => {
+        const g = new THREE.Group(), panel = new THREE.Mesh(new THREE.BoxGeometry(half, 3, 1.2), leafPanel);
+        panel.position.y = 1.5; g.add(panel);
+        return g;
+      },
+      lift: (mesh, h) => { mesh.position.y = TP[i].y - 3 + h * 3; }, // rises out of the road
+      lamp: s => [s * (w / 2 + 1.2), 8.5], // on the pillars
     });
-    leaves[0].pair = leaves[1]; leaves[1].pair = leaves[0];
-    return { i, leaves };
   });
-  const gateClock = () => state === 'race' ? raceTime : state === 'countdown' ? 0 : animTime;
 
   // ---- the plaza: turning bronze arms on pillars, then floor plates that slide side to side
   const arms = [];
@@ -2743,15 +2774,8 @@ function decoBronze(E) {
   return {
     moving: [...gates.flatMap(g => g.leaves.map(o => o.mesh)), ...arms.map(a => a.o.mesh), ...plates.map(p => p.o.mesh)],
     update(dt, t) {
-      const tt = gateClock();
-      for (const g of gates) for (const o of g.leaves) {
-        const h = o.height(tt);
-        o.on = h > 0.5;
-        o.mesh.position.y = TP[g.i].y - 3 + h * 3; // rises out of the road
-        const warn = !o.on && o.height(tt + 1.5) > 0.5;
-        o.lampMat.color.setHex(o.on ? 0xE8363C : warn ? (Math.sin(t * 14) > 0 ? 0xFFB020 : 0x5a3a10) : 0x2EC27E);
-        if (warn && player && player.path === MAIN && Math.abs(wi(player.idx - g.i + 40)) < 45 && Math.random() < 0.02) tone(220, 0.08, 'square', 0.03);
-      }
+      const tt = raceClock();
+      for (const g of gates) g.update(tt, t);
       for (const a of arms) { a.o.rot = a.base + tt * a.spin + a.phase; placeObstacle(a.o); }
       for (const p of plates) {
         const w = 1.2, amp = 5.5;
@@ -2821,7 +2845,6 @@ function decoPlateau(E) {
     levelGroup.add(line, rock);
     return { i, side, phase, lamps, rock, rolling: false };
   });
-  const rockClock = () => state === 'race' ? raceTime : state === 'countdown' ? 0 : animTime;
 
   addClouds(E, 12, { emissive: 0xa0aec0 });
 
@@ -2829,7 +2852,7 @@ function decoPlateau(E) {
     moving: crossings.map(c => c.rock),
     groundAt: heightAt,
     update(dt, t) {
-      const tt = rockClock();
+      const tt = raceClock();
       let warnAny = false;
       for (const c of crossings) {
         const local = ((tt + c.phase) % PERIOD + PERIOD) % PERIOD; // 0..ROLL rolling, then waiting
@@ -2944,6 +2967,184 @@ function decoOlumo(E) {
   addClouds(E, 12);
 
   return { moving: [], groundAt: heightAt, reset: fall.reset, bomb: fall.bomb, update: fall.update };
+}
+
+function decoGrove(E) {
+  const sc = L.scale;
+  const at = (x, z) => nearestOn(MAIN, x * sc, z * sc, 0, N - 1).i;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), col = new THREE.Color();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), lambert({ map: canvasTex(PAINT.gravel('#2f6a35', ['#265a2c', '#3a7a3e', '#4a6a2a', '#2a4a24']), 220, 220) }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(E.cx, -0.08, E.cz);
+  levelGroup.add(ground);
+
+  // where the road runs under the canopy (the rest is open: the clearing, the river)
+  const CANOPY = new Uint8Array(N);
+  for (const [a, b] of L.canopy) { const i0 = at(...a), len = wi(at(...b) - i0); for (let d = 0; d <= len; d++) CANOPY[wi(i0 + d)] = 1; }
+  const open = j => !CANOPY[j];
+
+  // the river, winding down from a spring and under the bridge, with rocks along its banks
+  const rx = 15 * sc;
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(34 * sc, 460).rotateX(-Math.PI / 2), new THREE.MeshPhongMaterial({ color: 0x2a8a7a, specular: 0xbfffe8, shininess: 60 }));
+  river.position.set(rx, 0.04, -232 * sc - 40);
+  levelGroup.add(river);
+  const riverRocks = [];
+  for (let k = 0; k < 40; k++) { const z = -232 * sc - 40 + rand(-230, 230), s = rand(1.5, 4); riverRocks.push([rx + (k % 2 ? 1 : -1) * (17 * sc + rand(-2, 3)), z, s]); }
+  const rr = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), lambert({ color: 0x7a7a70, flatShading: true }), riverRocks.length);
+  riverRocks.forEach(([x, z, s], n) => { q.setFromEuler(e.set(rand(0, 3), rand(0, 3), 0)); rr.setMatrixAt(n, m.compose(new V3(x, s * 0.3, z), q, new V3(s, s * 0.7, s))); });
+  levelGroup.add(rr);
+  const wet = (x, z) => Math.abs(x - rx) < 20 * sc && z < -232 * sc + 200;
+
+  // the forest: tall dense trees close beyond the barriers under the canopy, thinning at the clearing
+  const forest = roadside(E, MAIN, 9, 5, 10).filter(s => !wet(s[0], s[1]) && (CANOPY[s[5]] || Math.random() < 0.25)).map(s => [s[0], s[1]]);
+  addTrees(forest, { roundP: 0.85, hue: [0.27, 0.38], sat: [0.45, 0.65], lig: [0.16, 0.28], scale: [1.6, 2.6], trunk: 0x5a3a22 });
+  addTrees(E.spots(260, WALL + 30, 260, (x, z) => !wet(x, z)), { roundP: 0.85, hue: [0.27, 0.38], lig: [0.16, 0.3], scale: [1.4, 2.4], trunk: 0x5a3a22 });
+
+  // the canopy over the covered stretches: leafy boughs arching over the road, with gaps for light
+  const leafTex = canvasTex(makeCanvas(128, 128, (g, w, h) => {
+    for (let k = 0; k < 140; k++) {
+      g.fillStyle = ['#1f5a2a', '#2f7a3a', '#3a8a40', '#4a9a3a', '#2a6a30'][k % 5];
+      g.beginPath(); g.ellipse(Math.random() * w, Math.random() * h, rand(5, 14), rand(3, 8), rand(0, 3), 0, TAU); g.fill();
+    }
+  }), 3, 2);
+  const leafMat = lambert({ map: leafTex, alphaTest: 0.5, transparent: false, side: THREE.DoubleSide });
+  for (const [a, b] of L.canopy) {
+    const i0 = at(...a), i1 = i0 + wi(at(...b) - i0);
+    sweep(i0, i1, 10, (j, s, u) => {
+      const w = Math.max(wallL[j], wallR[j]) + 10;
+      return [Math.cos(Math.PI * u) * w, 11 + Math.sin(Math.PI * u) * 7 + Math.sin(j * 0.21 + u * 5) * 1.2];
+    }, leafMat, 3);
+  }
+  // shafts of sunlight slanting down through the gaps
+  const shaftMat = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const shaftGeo = new THREE.CylinderGeometry(1.2, 3.2, 22, 8, 1, true);
+  for (let j = 0; j < N; j += Math.round(40 / SEG)) {
+    if (!CANOPY[j]) continue;
+    const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+    placeOnTrack(shaft, j, rand(-6, 6), 9);
+    shaft.rotation.z = rand(-0.3, 0.3); shaft.rotation.x = rand(-0.2, 0.2);
+    levelGroup.add(shaft);
+  }
+  // vines hanging from the boughs, beside the road
+  const vineMat = lambert({ color: 0x2a6a2a });
+  for (let j = 0; j < N; j += Math.round(14 / SEG)) {
+    if (!CANOPY[j]) continue;
+    for (const s of [-1, 1]) {
+      const len = rand(4, 8), vine = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, len, 4), vineMat);
+      placeOnTrack(vine, j, s * ((s > 0 ? wallR[j] : wallL[j]) + rand(0.5, 3)), 15 - len / 2);
+      levelGroup.add(vine);
+    }
+  }
+
+  // the forest entrance: two great trees by the start, their boughs meeting over the road
+  const trunkMat = lambert({ color: 0x5a3a22, flatShading: true });
+  const entry = new THREE.Group(), ei = wi(Math.round(-12 / SEG)), ew = wallL[ei] + wallR[ei];
+  for (const s of [-1, 1]) {
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 3.4, 20, 9), trunkMat); trunk.position.set(s * (ew / 2 + 4), 10, 0);
+    const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(9, 0), lambert({ color: 0x2a6a30, flatShading: true })); crown.position.set(s * (ew / 2 + 2), 22, 0);
+    entry.add(trunk, crown);
+  }
+  const bough = new THREE.Mesh(new THREE.TorusGeometry(ew / 2 + 4, 1.2, 6, 24, Math.PI), trunkMat); bough.position.y = 10;
+  entry.add(bough);
+  placeOnTrack(entry, ei, (wallR[ei] - wallL[ei]) / 2);
+  levelGroup.add(entry);
+
+  // the sculpture-lined clearing: tall abstract forms in stone, terracotta, jade and wood (fictional
+  // shapes, set well back from the road, never in it)
+  const sMats = [0xb8a890, 0xb5653a, 0x3aa58a, 0x8a5a2a].map(c => lambert({ color: c, flatShading: true }));
+  const forms = [
+    mat => { const g = new THREE.Group(); for (let k = 0; k < 6; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(3 - k * 0.25, 2.4, 3 - k * 0.25), mat); b.position.y = 1.2 + k * 2.4; b.rotation.y = k * 0.35; g.add(b); } return g; },
+    mat => { const g = new THREE.Group(); const k = new THREE.Mesh(new THREE.TorusKnotGeometry(2.4, 0.7, 64, 8, 2, 3), mat); k.scale.set(1, 2.4, 1); k.position.y = 8; const base = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3, 1.4, 10), sMats[0]); base.position.y = 0.7; g.add(k, base); return g; },
+    mat => { const g = new THREE.Group(); const a = new THREE.Mesh(new THREE.TorusGeometry(5, 0.9, 8, 20, Math.PI), mat); a.position.y = 0.5; const ball = new THREE.Mesh(new THREE.SphereGeometry(1.4, 12, 10), sMats[2]); ball.position.y = 7; g.add(a, ball); return g; },
+    mat => { const g = new THREE.Group(); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.6, 14, 7), mat); c.position.y = 7; c.rotation.z = 0.12; const head = new THREE.Mesh(new THREE.ConeGeometry(2.4, 4, 7), mat); head.position.set(0.8, 15, 0); g.add(c, head); return g; },
+  ];
+  const c0 = at(-75, -224), c1 = at(-185, -165);
+  roadside(E, MAIN, 22, 10, 16, c0, c1).forEach(([x, z, , h], n) => {
+    const s = forms[n % forms.length](sMats[(n * 3) % sMats.length]);
+    s.position.set(x, 0, z); s.rotation.y = h + rand(-0.5, 0.5); s.scale.setScalar(rand(1, 1.4));
+    levelGroup.add(s);
+  });
+
+  // ---- hazards: roots across the edges, low branches over the edges (both off the racing line)
+  const rootMat = lambert({ color: 0x5a3a22, flatShading: true });
+  const roots = [[60, -8, 1], [105, -50, -1], [110, -95, 1], [112, -142, -1], [-160, -100, 1], [-126, -70, -1], [-140, -45, 1]];
+  roots.forEach(([x, z, s]) => {
+    const i = at(x, z), lat = s * (HALF - 1.2), g = new THREE.Group();
+    for (let k = 0; k < 3; k++) { const r = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.32, 5, 10, Math.PI), rootMat); r.position.set(rand(-0.8, 0.8), 0, (k - 1) * 0.9); r.rotation.y = Math.PI / 2 + rand(-0.4, 0.4); g.add(r); }
+    levelGroup.add(g);
+    addObstacle({ i, lat, len: 3, w: 2.6, kind: 'root', mesh: g });
+  });
+  [[45, -2, -1], [118, -105, 1], [102, -185, -1], [-170, -125, -1], [-127, -82, 1]].forEach(([x, z, s]) => {
+    const i = at(x, z), lat = s * (HALF - 0.9), g = new THREE.Group();
+    const wall = s > 0 ? wallR[i] : wallL[i];
+    const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, wall - HALF + 6, 6).rotateZ(Math.PI / 2), trunkMat);
+    branch.position.set(s * (wall - HALF + 6) / 2 - s * 1.5, 1.7, 0);
+    const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 0), lambert({ color: 0x2f7a3a, flatShading: true })); leaves.position.set(-s * 1.2, 1.9, 0);
+    g.add(branch, leaves);
+    levelGroup.add(g);
+    addObstacle({ i, lat, len: 1.4, w: 2.2, kind: 'barrier', mesh: g });
+  });
+
+  // ---- the moving wooden drawbridges on the river bridge (a fantasy touch, marked by jade lanterns):
+  // the two halves take turns to tip up, so one half is always open
+  const deckTex = lambert({ map: canvasTex(PAINT.planks(), 2, 1) });
+  const bi = at(14, -232);
+  const draw = addTimedPair(bi, 1.3, {
+    make: (s, half) => {
+      const g = new THREE.Group(), pivot = new THREE.Group(), deck = new THREE.Mesh(new THREE.BoxGeometry(half, 0.4, 7), deckTex);
+      deck.position.set(0, 0.22, 3.5); pivot.add(deck); g.add(pivot); g.userData.pivot = pivot;
+      return g;
+    },
+    lift: (mesh, h) => { mesh.userData.pivot.rotation.x = -h * 1.1; }, // tips up from its near edge
+    lamp: s => [s * ((s > 0 ? wallR[bi] : wallL[bi]) + 0.8), 3.2],
+  });
+  const lanternMat = lambert({ color: 0x3aa58a, emissive: 0x1a6a5a });
+  for (const d of [-30, -16, 16, 30]) for (const s of [-1, 1]) {
+    const j = wi(bi + Math.round(d / SEG)), post = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 3, 6), trunkMat); pole.position.y = 1.5;
+    const lantern = new THREE.Mesh(new THREE.OctahedronGeometry(0.6, 0), lanternMat); lantern.position.y = 3.3;
+    post.add(pole, lantern);
+    placeOnTrack(post, j, s * ((s > 0 ? wallR[j] : wallL[j]) + 0.6));
+    levelGroup.add(post);
+  }
+
+  // ---- falling leaves around the camera under the canopy, and the forest's greener, closer haze
+  const LEAVES = 140;
+  const leafGeo = new THREE.PlaneGeometry(0.45, 0.28);
+  const fall = new THREE.InstancedMesh(leafGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }), LEAVES);
+  fall.frustumCulled = false;
+  const lv = [];
+  for (let n = 0; n < LEAVES; n++) {
+    lv.push({ x: rand(-25, 25), y: rand(-4, 14), z: rand(-25, 25), v: rand(1.2, 2.6), ph: rand(0, TAU), spin: rand(1, 4) });
+    fall.setColorAt(n, col.setHex([0x6a9a3a, 0xc9a23a, 0x4a8a3a, 0xb5653a][n % 4]));
+  }
+  levelGroup.add(fall);
+  const fog0 = { near: L.fog[0], far: L.fog[1], color: new THREE.Color(L.sky[1]) }, fogIn = { near: 50, far: 360, color: new THREE.Color(0x3a5a3a) };
+  let under = 0;
+
+  addClouds(E, 8);
+
+  return {
+    moving: [...draw.leaves.map(o => o.mesh), fall],
+    update(dt, t) {
+      draw.update(raceClock(), t);
+      const k = player, inside = state !== 'title' && k && k.path === MAIN && CANOPY[k.idx] ? 1 : 0;
+      under = lerp(under, inside, 1 - Math.exp(-2 * dt));
+      scene.fog.near = lerp(fog0.near, fogIn.near, under); scene.fog.far = lerp(fog0.far, fogIn.far, under);
+      scene.fog.color.copy(fog0.color).lerp(fogIn.color, under * 0.6);
+      fall.visible = under > 0.05;
+      fall.material.opacity = 0.9 * under;
+      if (!fall.visible) return;
+      const c = camera.position;
+      lv.forEach((p, n) => {
+        p.y -= p.v * dt;
+        if (p.y < -4) { p.y = 14; p.x = rand(-25, 25); p.z = rand(-25, 25); }
+        q.setFromEuler(e.set(t * p.spin + p.ph, t * p.spin * 0.7, 0));
+        m.compose(new V3(c.x + p.x + Math.sin(t + p.ph) * 1.5, c.y + p.y, c.z + p.z), q, new V3(1, 1, 1));
+        fall.setMatrixAt(n, m);
+      });
+      fall.instanceMatrix.needsUpdate = true;
+    },
+  };
 }
 
 const LEVELS = [
@@ -3074,6 +3275,22 @@ const LEVELS = [
     arch: { post: 0x5a544e, bg: '#b0603a', text: '#FFFFFF', stripe: '#F3E5C0' },
     shoulder: () => PAINT.gravel('#b0603a', ['#9a5232', '#c27048', '#8a4a2c']), base: 'ground', deco: decoOlumo, dust: 0xb0603a, theme: 10,
     pads: [[0.05, 0], [0.3, 0], [0.58, 0], [0.92, 0]], boxes: [0.12, 0.47, 0.8],
+  },
+  {
+    name: 'Sacred Grove Sprint', tag: 'Osogbo · Forest circuit', band: 'linear-gradient(180deg,#f2d27a 0 25%,#2f7a3a 25% 70%,#3aa58a 70%)',
+    scale: 1.5, groundY: 0,
+    cp: [[-60, 0, 0], [30, 0, 0], [90, -25, 0], [120, -75, 0], [95, -120, 0], [125, -165, 0], [100, -210, 1], [48, -232, 4],
+      [-20, -232, 4], [-75, -224, 1], [-145, -215, 0], [-188, -168, 0], [-170, -112, 0], [-124, -88, 0], [-130, -58, 0], [-152, -34, 0], [-138, -10, 0], [-105, -2, 0]],
+    // a narrow woodland path straight through the clearing, twisting between the trees
+    branches: [{ from: [-80, -223], to: [-168, -106], cp: [[-96, -201], [-97, -181], [-111, -166], [-115, -147], [-136, -127]], half: 4, ai: 0.4 }],
+    branchLook: { road: ['#7a5a3a', 'rgba(0,0,0,0)', 'rgba(0,0,0,0)'], wall: ['#8a5a2a', '#6a4a22', '#3a2a14'], shoulder: () => PAINT.gravel('#3a5a2a', ['#2f4a24', '#4a6a34']) },
+    canopy: [[[25, 0], [100, -205]], [[-168, -108], [-122, -10]]],
+    narrow: [{ from: [55, -232], to: [-27, -232], wall: 12.8 }],
+    sky: [0x6fb0d8, 0xe8f0c8], fog: [240, 820], hemi: [0xfff4d8, 0x2f5a2a, 0.9], sun: [0xffe2a0, 0.8],
+    road: ['#6a5040', '#E8D8A8', 'rgba(255,230,160,0.4)'], curb: ['#8a5a2a', '#E8D8A8'], wall: ['#8a5a2a', '#a8743f', '#3a2a14'],
+    arch: { post: 0x5a3a22, bg: '#2f5a3a', text: '#f2d27a', stripe: '#3aa58a' },
+    shoulder: () => PAINT.gravel('#4a5a2a', ['#3a4a22', '#5a6a34', '#6a5030']), slab: 0x8a7a64, base: 'flyover', deco: decoGrove, dust: 0x6a5a3a, theme: 11,
+    pads: [[0.06, 0], [0.35, 0], [0.62, 0], [0.94, 0]], boxes: [0.15, 0.56, 0.8],
   },
   {
     name: 'Pepper Hill', tag: 'Rolling green hills', band: 'linear-gradient(180deg,#8FD3F5 0 55%,#62B84A 55%)',
@@ -3875,6 +4092,15 @@ const THEMES = [
     drums: { kick: 'x..x....x..x....', tom: 'h.hm.l..h.hm.l.m', bell: 'x.x.xx.x.x.xx.x.', shaker: 'x.xxx.xxx.xxx.xx', clap: '....x.......x...' },
     amb: 'courtyard',
   },
+  { // 11 Sacred Grove Sprint: hushed and green, bell melody over a soft pad and gentle drums
+    bpm: 98, scale: 'major', leadBase: 74, bassBase: 43, padBase: 55, arpBase: 67, chords: [0, 5, 3, 4, 0, 5, 1, 4],
+    lead: ['4...7...6.4.2...', '5...9...7.5.4...', '3...5...4.2.0...', '1...2...4-------',
+      '7...9...E.9.7...', '9...7...5.4.2...', '3.4.5.7.9.7.5.4.', '4---------------'],
+    leadVoice: 'bell', leadVol: 0.07, bass: 'R.......5...R...', bassVoice: 'sineBass', bassVol: 0.15, pad: true, padVol: 0.028,
+    arp: '0.2.4.7.4.2.0.2.', arpVoice: 'pluck', arpVol: 0.03,
+    drums: { kick: 'x.......x.......', tom: '..h...m...h.l...', shaker: '..x...x...x...x.' },
+    amb: 'forest',
+  },
 ];
 
 function playStep(th, s, t, sd) {
@@ -3953,6 +4179,20 @@ function startAmbience(kind) {
     tick = t => {
       if (Math.random() < 0.08) noiseHit(t, 'highpass', 3000, rand(0.015, 0.045), 0.02, ambBus);
       if (Math.random() < 0.004) noiseHit(t, 'lowpass', 90, 0.45, 1.8, ambBus, brownBuf);
+    };
+  } else if (kind === 'forest') {
+    // a deep forest: leaves rustling, a stream, insects, and birds calling back and forth
+    const f = filt('bandpass', 1800, 0.5), g = gain(0.02);
+    loop(noiseBuf).connect(f); f.connect(g); g.connect(ambBus);
+    lfo(0.19, 0.012, g.gain);
+    const f2 = filt('lowpass', 700), g2 = gain(0.03);
+    loop(noiseBuf).connect(f2); f2.connect(g2); g2.connect(ambBus);
+    const f3 = filt('bandpass', 4800, 4), g3 = gain(0.004);
+    loop(noiseBuf).connect(f3); f3.connect(g3); g3.connect(ambBus);
+    lfo(6, 0.003, g3.gain);
+    tick = t => {
+      if (Math.random() < 0.01) { const base = rand(1800, 3200); blip(t, 'sine', base, base * 1.4, 0.12, 0.03); blip(t + 0.15, 'sine', base * 1.2, base, 0.12, 0.025); }
+      if (Math.random() < 0.004) { const base = rand(700, 1000); for (let k = 0; k < 3; k++) blip(t + k * 0.3, 'sine', base, base * 0.9, 0.2, 0.025); }
     };
   } else if (kind === 'courtyard') {
     // a breeze through the courtyards, birds, wind chimes, and drums somewhere across the city
@@ -4265,7 +4505,7 @@ function giveBoost(k, t, kind) {
 // an online race sees the same thing without sending anything.
 function addObstacle(o) {
   o = Object.assign({ path: MAIN, len: 4, w: 2.4, kind: 'parked', speed: 0, y: 0, on: true }, o);
-  o.solid = !['hole', 'puddle', 'mud', 'slide'].includes(o.kind);
+  o.solid = !['hole', 'root', 'puddle', 'mud', 'slide'].includes(o.kind);
   o.x = 0; o.z = 0; o.fx = 0; o.fz = 1;
   placeObstacle(o);
   OBST.push(o);
@@ -4322,10 +4562,10 @@ function collideObstacles(k, dt) {
         emit(dust, k.pos.x + rand(-1, 1), k.pos.y + 0.3, k.pos.z + rand(-1, 1), rand(-2, 2), rand(1, 3), rand(-2, 2), 0x6b4a2a, 0.5, 1, 10);
       continue;
     }
-    if (o.kind === 'hole') {
+    if (o.kind === 'hole' || o.kind === 'root') { // a pothole or roots across the edge: a jolt
       if (k.holeT <= 0 && Math.abs(k.speed) > 8) {
         k.holeT = 0.9; k.speed *= 0.62; k.hopT = 0.28; k.drift.active = false;
-        if (k === player) { sfx.bump(); shake = 0.3; toast('Pothole!', 'warn', 700); }
+        if (k === player) { sfx.bump(); shake = 0.3; toast(o.kind === 'root' ? 'Roots!' : 'Pothole!', 'warn', 700); }
       }
       continue;
     }
