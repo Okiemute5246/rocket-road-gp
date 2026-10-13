@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>OYA KART!</title>
-<meta name="description" content="A 3D kart racer in your browser: four tracks to unlock, drifting, items, five rivals and online races with friends.">
+<meta name="description" content="A 3D kart racer in your browser: 13 Nigerian tracks in four cups, drifting, items, five rivals and online races with friends.">
 <meta name="theme-color" content="#1B1330">
 <meta name="author" content="Okiemute Vadan Ejite-Orode">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231B1330'/%3E%3Cpath d='M7 21h18l-2-6H11z' fill='%23E8363C'/%3E%3Ccircle cx='11' cy='22' r='3' fill='%23FFD23F'/%3E%3Ccircle cx='22' cy='22' r='3' fill='%23FFD23F'/%3E%3C/svg%3E">
@@ -192,6 +192,15 @@
   .chip small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
   .chip[aria-pressed="true"], .seg button[aria-pressed="true"], .trk[aria-pressed="true"] { border-color: var(--sun); background: #3A2C6A; box-shadow: inset 0 0 0 1px var(--sun); }
   .tracks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cups { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .cups button {
+    font-family: var(--ui); font-weight: 700; font-size: 12px; line-height: 1.15; color: var(--muted);
+    background: var(--ink-2); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 6px;
+    padding: 6px 4px; cursor: pointer; text-align: center;
+  }
+  .cups button[aria-selected="true"] { color: var(--paper); border-color: var(--sun); background: #3A2C6A; }
+  .cups button .lk { display: block; font-size: 9px; letter-spacing: 0.12em; color: var(--sun); }
+  .cup-tag { margin: -2px 0 0; font-size: 12px; color: var(--muted); }
   .trk { display: flex; flex-direction: column; gap: 1px; padding: 0 0 10px; overflow: hidden; text-align: left; }
   .trk .band { display: block; height: 30px; margin-bottom: 6px; position: relative; }
   .trk .band::after {
@@ -436,6 +445,8 @@
     .trk b { font-size: 15px; }
     .trk small { font-size: 10px; }
     .trk .lock { font-size: 9px; top: 2px; padding: 1px 4px; }
+    .cups button { font-size: 10px; padding: 3px 2px; }
+    .cup-tag { font-size: 10px; }
     .chips { grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .chip { padding: 5px 6px; gap: 6px; font-size: 13px; }
     .chip small { display: none; }
@@ -528,17 +539,19 @@
     <div class="cols">
       <div class="col">
         <div class="group">
-          <div class="eyebrow"><span id="trackCount">4</span> tracks &middot; 3 laps &middot; 6 racers</div>
+          <div class="eyebrow"><span id="trackCount">13</span> tracks &middot; 4 cups &middot; 3 laps &middot; 6 racers</div>
           <h1 class="logo">OYA <span>KART!</span></h1>
         </div>
         <div class="group">
           <div class="lbl-row">
-            <div class="lbl">Track</div>
+            <div class="lbl">Cup &amp; track</div>
             <button class="linkbtn" id="resetBtn">Reset progress</button>
           </div>
+          <div class="cups" id="cupTabs" role="tablist"></div>
+          <p class="cup-tag" id="cupTag"></p>
           <div class="tracks" id="tracks"></div>
         </div>
-        <p class="tip">Hold <b>drift</b> while turning. Sparks go <b>blue</b>, then <b>orange</b>. Let go for a mini-turbo. Hold <kbd>S</kbd> when using a shell to throw it backwards. Hold the gas as the <b>2</b> fades for a rocket start. On Magma Mountain, steer clear of the red rings: lava is about to land there.</p>
+        <p class="tip">Hold <b>drift</b> while turning. Sparks go <b>blue</b>, then <b>orange</b>. Let go for a mini-turbo. Hold <kbd>S</kbd> when using a shell to throw it backwards. Hold the gas as the <b>2</b> fades for a rocket start. Red rings show where falling rocks will land, and every track hides a shortcut.</p>
       </div>
       <div class="col">
         <div class="group">
@@ -589,7 +602,7 @@
     <div class="checker"></div>
     <div class="res-grid">
       <div class="group res-head">
-        <div class="eyebrow" id="resSub">Pepper Hill &middot; 100cc</div>
+        <div class="eyebrow" id="resSub">Danfo Dash &middot; 100cc</div>
         <h2 id="resTitle">You finished 1st</h2>
       </div>
       <table class="res"><tbody id="resBody"></tbody></table>
@@ -657,7 +670,8 @@
           <div class="chips" id="lobbyChips"></div>
         </div>
         <div class="group" id="hostOpts">
-          <div class="lbl">Track</div>
+          <div class="lbl">Cup &amp; track</div>
+          <div class="cups" id="lobbyCupTabs" role="tablist"></div>
           <div class="tracks" id="lobbyTracks"></div>
           <div class="lbl">Engine class</div>
           <div class="seg" id="lobbyClass">
@@ -769,22 +783,6 @@ const PAINT = {
     g.fillStyle = b; g.fillRect(0, h / 2, w, h / 2);
     if (cap) { g.fillStyle = cap; g.fillRect(w - 5, 0, 5, h); }
   }),
-  grass: () => makeCanvas(128, 128, (g, w, h) => {
-    g.fillStyle = '#62B84A'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 900; i++) {
-      g.fillStyle = Math.random() < 0.5 ? 'rgba(40,110,40,0.35)' : 'rgba(150,210,90,0.35)';
-      g.fillRect(Math.random() * w, Math.random() * h, 2, 3);
-    }
-  }),
-  cloud: (tint) => makeCanvas(128, 128, (g, w, h) => {
-    g.fillStyle = '#FFF8FC'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 40; i++) {
-      const x = Math.random() * w, y = Math.random() * h, r = rand(8, 26);
-      const gr = g.createRadialGradient(x, y, 0, x, y, r);
-      gr.addColorStop(0, tint); gr.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
-    }
-  }),
   planks: () => makeCanvas(64, 128, (g, w, h) => {
     for (let y = 0; y < h; y += 16) {
       g.fillStyle = ['#B98552', '#A8743F', '#C49160'][(y / 16) % 3];
@@ -799,27 +797,6 @@ const PAINT = {
       g.fillStyle = dots[Math.random() * dots.length | 0];
       g.fillRect(Math.random() * w, Math.random() * h, rand(1, 3), rand(1, 3));
     }
-  }),
-  cracks: (base, glow) => makeCanvas(256, 256, (g, w, h) => {
-    g.fillStyle = base; g.fillRect(0, 0, w, h);
-    g.strokeStyle = glow; g.lineWidth = 2.5; g.lineCap = 'round';
-    for (let k = 0; k < 14; k++) {
-      let x = Math.random() * w, y = Math.random() * h;
-      g.beginPath(); g.moveTo(x, y);
-      for (let s = 0; s < 6; s++) { x += rand(-26, 26); y += rand(-26, 26); g.lineTo(x, y); }
-      g.stroke();
-    }
-  }),
-  lava: () => makeCanvas(128, 128, (g, w, h) => {
-    g.fillStyle = '#FF4A12'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 50; i++) {
-      const x = Math.random() * w, y = Math.random() * h, r = rand(6, 20);
-      const gr = g.createRadialGradient(x, y, 0, x, y, r);
-      gr.addColorStop(0, Math.random() < 0.5 ? '#FFE14D' : '#FF9A1F'); gr.addColorStop(1, 'rgba(255,74,18,0)');
-      g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
-    }
-    g.fillStyle = 'rgba(80,10,0,0.5)';
-    for (let i = 0; i < 12; i++) { g.beginPath(); g.arc(Math.random() * w, Math.random() * h, rand(3, 8), 0, TAU); g.fill(); }
   }),
   bands: (a, b, n) => makeCanvas(16, 128, (g, w, h) => {
     for (let i = 0; i < n; i++) { g.fillStyle = i % 2 ? b : a; g.fillRect(0, i * h / n, w, h / n); }
@@ -1104,425 +1081,6 @@ function addClouds(E, count, o = {}) {
     out.push(c);
   }
   return out;
-}
-
-// ---------- level decorations
-function decoHills(E) {
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), lambert({ map: canvasTex(PAINT.grass(), 260, 260) }));
-  ground.rotation.x = -Math.PI / 2; ground.position.set(E.cx, -0.08, E.cz);
-  levelGroup.add(ground);
-  addTrees(E.spots(280, WALL + 6));
-  addMountains(E);
-  addClouds(E, 16);
-
-  // grandstand on the outside of the start straight
-  const crowd = canvasTex(makeCanvas(256, 128, (g, w, h) => {
-    g.fillStyle = '#3A2C6A'; g.fillRect(0, 0, w, h);
-    const hues = ['#E8363C', '#FFD23F', '#3DDC97', '#4FC3FF', '#FF6FB5', '#FFFFFF', '#FF8A1F'];
-    for (let y = 6; y < h; y += 12) for (let x = 4 + (y / 12 % 2) * 4; x < w; x += 8) {
-      g.fillStyle = hues[Math.random() * hues.length | 0];
-      g.beginPath(); g.arc(x, y, 3, 0, TAU); g.fill();
-    }
-  }), 4, 1);
-  const stand = new THREE.Group();
-  const standMat = lambert({ map: crowd });
-  const baseMat = lambert({ color: 0x1B1330 });
-  for (let k = 0; k < 4; k++) {
-    const step = new THREE.Mesh(new THREE.BoxGeometry(48, 2.2, 3), [baseMat, baseMat, baseMat, baseMat, baseMat, standMat]);
-    step.position.set(0, 1.1 + k * 2.2, -(k * 3));
-    step.rotation.y = Math.PI;
-    stand.add(step);
-  }
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(50, 0.6, 14), lambert({ color: 0xE8363C }));
-  roof.position.set(0, 12.5, -5);
-  stand.add(roof);
-  for (const x of [-24, 0, 24]) {
-    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.6, 12.5, 0.6), baseMat);
-    pole.position.set(x, 6.25, -11);
-    stand.add(pole);
-  }
-  const si = 50;
-  stand.position.set(TP[si].x + TS[si].x * (wallR[si] + 5), 0, TP[si].z + TS[si].z * (wallR[si] + 5));
-  stand.rotation.y = headingAt(si) + Math.PI / 2;
-  levelGroup.add(stand);
-  return {};
-}
-
-function decoSky(E) {
-  // sea of clouds far below
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), new THREE.MeshBasicMaterial({ map: canvasTex(PAINT.cloud('rgba(255,190,225,0.55)'), 40, 40) }));
-  sea.rotation.x = -Math.PI / 2; sea.position.set(E.cx, -90, E.cz);
-  levelGroup.add(sea);
-  addClouds(E, 36, { y: [-75, -35], r: [0, 700], color: 0xffffff, emissive: 0xcbb8e8, fog: true, size: [16, 30] });
-  addClouds(E, 26, { y: [-10, 70], r: [100, 750], color: 0xffffff, emissive: 0xcbb8e8, fog: true, size: [10, 20],
-    test: (x, y, z) => !E.nearTrack(x, z, WALL + 45) });
-  addClouds(E, 14, { y: [180, 300], r: [400, 1000], emissive: 0xd0c0f0 });
-
-  // floating islands with trees
-  const islands = [];
-  const rockMat = lambert({ color: 0x8a6a55, flatShading: true });
-  const topMat = lambert({ color: 0x7ED36F, flatShading: true });
-  const treeMat = lambert({ color: 0x3f9e57, flatShading: true });
-  for (const [x, z] of E.spots(12, WALL + 45, 260)) {
-    const g = new THREE.Group();
-    const r = rand(12, 24);
-    const rock = new THREE.Mesh(new THREE.ConeGeometry(r, r * 1.7, 7), rockMat);
-    rock.rotation.x = Math.PI; rock.position.y = -r * 0.85;
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.02, r, 2.5, 9), topMat);
-    g.add(rock, top);
-    for (let k = 0; k < 3; k++) {
-      const t = new THREE.Mesh(new THREE.ConeGeometry(2.2, 6, 6), treeMat);
-      const a = rand(0, TAU), d = rand(0, r * 0.6);
-      t.position.set(Math.cos(a) * d, 4.2, Math.sin(a) * d);
-      g.add(t);
-    }
-    const base = rand(-30, 40);
-    g.position.set(x, base, z);
-    levelGroup.add(g);
-    islands.push({ g, base, ph: rand(0, TAU) });
-  }
-
-  // hot-air balloons
-  const balloons = [];
-  const balloonCols = [['#E8363C', '#FFD23F'], ['#4FC3FF', '#FFFFFF'], ['#7B4DFF', '#FF6FB5'], ['#3DDC97', '#FFFFFF'], ['#FF8A1F', '#1B1330']];
-  const basketMat = lambert({ color: 0x8b5a2b });
-  const ropeMat = lambert({ color: 0x3a2a1a });
-  for (const [x, z] of E.spots(8, WALL + 30, 200)) {
-    const cc = balloonCols[Math.random() * balloonCols.length | 0];
-    const g = new THREE.Group();
-    const env = new THREE.Mesh(new THREE.SphereGeometry(7, 16, 12), lambert({ map: canvasTex(PAINT.vstripes([cc[0], cc[1], cc[0], cc[1], cc[0], cc[1], cc[0], cc[1]])) }));
-    env.scale.y = 1.15;
-    const basket = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2, 2.6), basketMat);
-    basket.position.y = -11;
-    g.add(env, basket);
-    for (const [rx, rz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-      const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 5, 4), ropeMat);
-      rope.position.set(rx * 1.6, -8, rz * 1.6);
-      g.add(rope);
-    }
-    const base = rand(25, 80);
-    g.position.set(x, base, z);
-    levelGroup.add(g);
-    balloons.push({ g, x, z, base, ph: rand(0, TAU), r: rand(10, 30) });
-  }
-
-  // rainbow gates over the road
-  const RB = [0xE8363C, 0xFF8A1F, 0xFFD23F, 0x3DDC97, 0x4FC3FF, 0x7B4DFF];
-  const rbMats = RB.map(c => new THREE.MeshBasicMaterial({ color: c }));
-  for (const f of [0.27, 0.71]) {
-    const g = new THREE.Group();
-    RB.forEach((c, n) => g.add(new THREE.Mesh(new THREE.TorusGeometry(HALF + 10 - n * 0.9, 0.45, 6, 44, Math.PI), rbMats[n])));
-    const i = Math.floor(f * N);
-    placeOnTrack(g, i, (wallR[i] - wallL[i]) / 2, 0);
-    levelGroup.add(g);
-  }
-  // giant rainbow on the horizon
-  const big = new THREE.Group();
-  RB.forEach((c, n) => big.add(new THREE.Mesh(new THREE.TorusGeometry(520 - n * 16, 8, 6, 60, Math.PI),
-    new THREE.MeshBasicMaterial({ color: c, fog: false, transparent: true, opacity: 0.5, depthWrite: false }))));
-  big.position.set(E.cx + 300, -120, E.cz - 1100);
-  big.rotation.y = 0.3;
-  levelGroup.add(big);
-
-  return {
-    update(dt, t) {
-      for (const s of islands) s.g.position.y = s.base + Math.sin(t * 0.5 + s.ph) * 2.5;
-      for (const b of balloons) {
-        b.g.position.set(b.x + Math.cos(t * 0.05 + b.ph) * b.r, b.base + Math.sin(t * 0.4 + b.ph) * 4, b.z + Math.sin(t * 0.05 + b.ph) * b.r);
-      }
-    },
-  };
-}
-
-function decoSea(E) {
-  // animated water
-  const SEGS = 48;
-  const wgeo = new THREE.PlaneGeometry(2800, 2800, SEGS, SEGS).rotateX(-Math.PI / 2);
-  const water = new THREE.Mesh(wgeo, new THREE.MeshPhongMaterial({ color: 0x1b9dc4, specular: 0xbff3ff, shininess: 60, transparent: true, opacity: 0.93 }));
-  water.position.set(E.cx, 0, E.cz);
-  levelGroup.add(water);
-  const wpos = wgeo.attributes.position;
-
-  // bridge pillars
-  const pillarGeo = new THREE.CylinderGeometry(1.3, 1.5, 1, 8).translate(0, 0.5, 0);
-  const idxs = [];
-  for (let i = 0; i < N; i += 26) idxs.push(i);
-  const pillars = new THREE.InstancedMesh(pillarGeo, lambert({ color: 0xd8cfc2 }), idxs.length * 2);
-  const m = new THREE.Matrix4();
-  let n = 0;
-  for (const i of idxs) for (const side of [-1, 1]) {
-    const lat = side > 0 ? wallR[i] - 3 : -wallL[i] + 3;
-    const top = TP[i].y - 1.8, bot = -14;
-    m.makeScale(1, top - bot, 1).setPosition(TP[i].x + TS[i].x * lat, bot, TP[i].z + TS[i].z * lat);
-    pillars.setMatrixAt(n++, m);
-  }
-  levelGroup.add(pillars);
-
-  // islands with palms
-  const sandMat = lambert({ color: 0xF1D9A0, flatShading: true });
-  const trunkMat = lambert({ color: 0x9a6a3a, flatShading: true });
-  const leafMat = lambert({ color: 0x2f9e57, flatShading: true });
-  const rockMat = lambert({ color: 0x7d7a74, flatShading: true });
-  const palm = (x, y, z, sc) => {
-    const g = new THREE.Group();
-    const lean = rand(-0.25, 0.25);
-    for (let k = 0; k < 5; k++) {
-      const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 2.4, 6), trunkMat);
-      seg.position.set(lean * k * 1.6, 1.2 + k * 2.2, 0);
-      seg.rotation.z = -lean * 0.6;
-      g.add(seg);
-    }
-    const top = new V3(lean * 4 * 1.6, 11.5, 0);
-    for (let k = 0; k < 7; k++) {
-      const leaf = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 6).translate(0, 0, 3), leafMat);
-      leaf.position.copy(top);
-      leaf.rotation.order = 'YXZ';
-      leaf.rotation.y = k / 7 * TAU; leaf.rotation.x = 0.45;
-      g.add(leaf);
-    }
-    g.position.set(x, y, z); g.scale.setScalar(sc); g.rotation.y = rand(0, TAU);
-    levelGroup.add(g);
-  };
-  const islandSpots = E.spots(10, WALL + 35, 260);
-  islandSpots.forEach(([x, z], k) => {
-    const r = rand(14, 32);
-    const mound = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 8), sandMat);
-    mound.scale.y = 0.2; mound.position.set(x, -r * 0.05, z);
-    levelGroup.add(mound);
-    const np = 1 + (Math.random() * 3 | 0);
-    for (let q = 0; q < np; q++) { const a = rand(0, TAU), d = rand(0, r * 0.5); palm(x + Math.cos(a) * d, r * 0.12, z + Math.sin(a) * d, rand(0.8, 1.2)); }
-    if (Math.random() < 0.6) {
-      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(2, 4), 0), rockMat);
-      rock.position.set(x + rand(-r, r) * 0.5, 1, z + rand(-r, r) * 0.5);
-      levelGroup.add(rock);
-    }
-    if (k === 0) {
-      // lighthouse
-      const lh = new THREE.Group();
-      const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.8, 26, 14), lambert({ map: canvasTex(PAINT.bands('#FFFFFF', '#E8363C', 6)) }));
-      tower.position.y = 13;
-      const lamp = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 3, 10), lambert({ color: 0xfff1a0, emissive: 0xffd23f }));
-      lamp.position.y = 27.5;
-      const cap = new THREE.Mesh(new THREE.ConeGeometry(3.2, 3.5, 10), lambert({ color: 0xE8363C }));
-      cap.position.y = 30.7;
-      lh.add(tower, lamp, cap);
-      lh.position.set(x, r * 0.12, z);
-      levelGroup.add(lh);
-    }
-  });
-  // sea stacks
-  for (const [x, z] of E.spots(20, WALL + 20, 300)) {
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(3, 9), 0), rockMat);
-    rock.position.set(x, rand(-2, 1), z); rock.rotation.set(rand(0, 3), rand(0, 3), 0);
-    levelGroup.add(rock);
-  }
-
-  // sailboats
-  const boats = [];
-  const sailShape = new THREE.Shape(); sailShape.moveTo(0, 0); sailShape.lineTo(0, 11); sailShape.lineTo(6, 0); sailShape.lineTo(0, 0);
-  const sailMat = lambert({ color: 0xffffff, side: THREE.DoubleSide });
-  const hullMats = [0xE8363C, 0x2D6BFF, 0xFFD23F, 0xffffff].map(c => lambert({ color: c }));
-  for (const [x, z] of E.spots(7, WALL + 60, 320)) {
-    const g = new THREE.Group();
-    const hull = new THREE.Mesh(new THREE.BoxGeometry(3, 1.4, 8), hullMats[Math.random() * 4 | 0]);
-    hull.position.y = 0.4;
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 12, 5), trunkMat);
-    mast.position.set(0, 6.5, 0.5);
-    const sail = new THREE.Mesh(new THREE.ShapeGeometry(sailShape), sailMat);
-    sail.rotation.y = -Math.PI / 2; sail.position.set(0, 1.3, 0.6);
-    g.add(hull, mast, sail);
-    levelGroup.add(g);
-    boats.push({ g, x, z, r: rand(20, 45), sp: rand(0.03, 0.07) * (Math.random() < 0.5 ? -1 : 1), ph: rand(0, TAU) });
-  }
-
-  addMountains(E, { colors: [0x5f9e86, 0x6fae94, 0x4f8c77], snow: 0, count: 16, h: [60, 140], w: [160, 260], y: -5 });
-  addClouds(E, 14);
-
-  let frameN = 0;
-  return {
-    update(dt, t) {
-      for (let i = 0; i < wpos.count; i++) {
-        const x = wpos.getX(i), z = wpos.getZ(i);
-        wpos.setY(i, Math.sin(x * 0.035 + t * 1.2) * 0.45 + Math.cos(z * 0.03 + t * 0.9) * 0.45);
-      }
-      wpos.needsUpdate = true;
-      if ((frameN++ % 3) === 0) wgeo.computeVertexNormals();
-      for (const b of boats) {
-        const a = t * b.sp + b.ph;
-        b.g.position.set(b.x + Math.cos(a) * b.r, Math.sin(t * 1.3 + b.ph) * 0.3, b.z + Math.sin(a) * b.r);
-        b.g.rotation.y = -a + (b.sp > 0 ? 0 : Math.PI);
-        b.g.rotation.z = Math.sin(t * 1.1 + b.ph) * 0.06;
-      }
-    },
-  };
-}
-
-function decoVolcano(E) {
-  const G = L.groundY;
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), lambert({
-    map: canvasTex(PAINT.cracks('#2b2327', '#3a2a28'), 70, 70),
-    emissive: 0xff5a1f, emissiveMap: canvasTex(PAINT.cracks('#000000', '#ff7a2a'), 70, 70),
-  }));
-  ground.rotation.x = -Math.PI / 2; ground.position.set(E.cx, G, E.cz);
-  levelGroup.add(ground);
-
-  // the volcano
-  const vc = new V3(L.volcano[0] * L.scale, G, L.volcano[1] * L.scale);
-  const H = 230;
-  const coneGeo = new THREE.CylinderGeometry(30, 150, H, 16, 6, true);
-  const cp = coneGeo.attributes.position;
-  for (let i = 0; i < cp.count; i++) {
-    const y = cp.getY(i);
-    if (y > H / 2 - 1) continue;
-    const x = cp.getX(i), z = cp.getZ(i), f = 1 + (hash(x * 0.3 + z * 0.7 + y) - 0.5) * 0.06;
-    cp.setXYZ(i, x * f, y, z * f);
-  }
-  coneGeo.computeVertexNormals();
-  const cone = new THREE.Mesh(coneGeo, lambert({ color: 0x4a3234, emissive: 0x2a0a04, flatShading: true, fog: false }));
-  cone.position.set(vc.x, G + H / 2, vc.z);
-  levelGroup.add(cone);
-  const lavaTex = canvasTex(PAINT.lava(), 2, 2);
-  const lavaMat = new THREE.MeshBasicMaterial({ map: lavaTex, fog: false });
-  const crater = new THREE.Mesh(new THREE.CircleGeometry(30, 16).rotateX(-Math.PI / 2), lavaMat);
-  crater.position.set(vc.x, G + H - 3, vc.z);
-  levelGroup.add(crater);
-  const flowTex = canvasTex(PAINT.lava(), 1, 6);
-  const flowMat = new THREE.MeshBasicMaterial({ map: flowTex, side: THREE.DoubleSide, fog: false });
-  for (let k = 0; k < 6; k++) {
-    const flow = new THREE.Mesh(new THREE.CylinderGeometry(32.5, 156, H, 3, 1, true, rand(0, TAU), rand(0.06, 0.14)), flowMat);
-    flow.position.copy(cone.position);
-    levelGroup.add(flow);
-  }
-  const glow = new THREE.PointLight(0xff6a2a, 1.6, 900);
-  glow.position.set(vc.x, G + H + 30, vc.z);
-  levelGroup.add(glow);
-  const top = new V3(vc.x, G + H, vc.z);
-
-  // lava pools, rocks, dead trees
-  const embank = WALL + (E.maxY - G) * 1.5 + 12;
-  for (const [x, z] of E.spots(16, embank, 200, (x, z) => Math.hypot(x - vc.x, z - vc.z) > 150)) {
-    const pool = new THREE.Mesh(new THREE.CircleGeometry(rand(8, 20), 18).rotateX(-Math.PI / 2), lavaMat);
-    pool.position.set(x, G + 0.15, z);
-    levelGroup.add(pool);
-  }
-  const rockGeo = new THREE.DodecahedronGeometry(1, 0);
-  const rocks = E.spots(140, embank - 6, 250, (x, z) => Math.hypot(x - vc.x, z - vc.z) > 140);
-  const rockMesh = new THREE.InstancedMesh(rockGeo, lambert({ color: 0x2e2629, flatShading: true }), Math.max(1, rocks.length));
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new V3(), p = new V3();
-  rocks.forEach(([x, z], i) => {
-    const sc = rand(1.5, 7);
-    q.setFromEuler(new THREE.Euler(rand(0, 3), rand(0, 3), 0));
-    m.compose(p.set(x, G + sc * 0.3, z), q, s.set(sc, sc * rand(0.6, 1.2), sc));
-    rockMesh.setMatrixAt(i, m);
-  });
-  levelGroup.add(rockMesh);
-  const deadMat = lambert({ color: 0x1f1719, flatShading: true });
-  for (const [x, z] of E.spots(40, embank, 200, (x, z) => Math.hypot(x - vc.x, z - vc.z) > 150)) {
-    const g = new THREE.Group();
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.5, 7, 5), deadMat);
-    trunk.position.y = 3.5;
-    g.add(trunk);
-    for (const sgn of [-1, 1]) {
-      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.22, 3, 4), deadMat);
-      br.position.set(sgn * 0.8, 4.5 + rand(0, 2), 0); br.rotation.z = sgn * -0.8;
-      g.add(br);
-    }
-    g.position.set(x, G, z); g.rotation.y = rand(0, TAU);
-    levelGroup.add(g);
-  }
-  addMountains(E, { colors: [0x3a1a1c, 0x4a2224, 0x2e1618], snow: 0, count: 18, h: [120, 240], y: G - 10 });
-
-  // the tunnel through the ridge
-  if (tunnel) {
-    const { i0, i1 } = tunnel;
-    const archW = j => (wallL[j] + wallR[j]) / 2 + 0.4, archC = j => (wallR[j] - wallL[j]) / 2;
-    sweep(i0, i1, 16, (j, s, a) => [archC(j) + Math.cos(Math.PI * a) * archW(j), Math.sin(Math.PI * a) * 13],
-      lambert({ map: canvasTex(PAINT.gravel('#3a2f30', ['#2a2123', '#4a3c3c', '#5a3a2a']), 1, 1), side: THREE.DoubleSide }));
-    sweep(i0, i1, 16, (j, s, a) => {
-      const bump = Math.sin(Math.PI * s);
-      const w = archW(j) + 4 + 42 * bump * (0.85 + 0.3 * hash(a * 7.1 + s * 13.3));
-      const h = 15 + 58 * bump * (0.8 + 0.4 * hash(a * 3.3 + s * 29.7));
-      return [archC(j) + Math.cos(Math.PI * a) * w, Math.sin(Math.PI * a) * h - 2];
-    }, lambert({ color: 0x3d3033, flatShading: true, side: THREE.DoubleSide }));
-    const lampMat = new THREE.MeshBasicMaterial({ color: 0xffa040 });
-    for (let j = i0 + 12; j < i1 - 6; j += 26) {
-      for (const lat of [wallR[j] - 0.4, -wallL[j] + 0.4]) {
-        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 3), lampMat);
-        placeOnTrack(lamp, j, lat, 7);
-        levelGroup.add(lamp);
-      }
-    }
-  }
-
-  // lava bombs
-  const bombs = [];
-  const ringGeo = new THREE.RingGeometry(4.2, 5.2, 28).rotateX(-Math.PI / 2);
-  const bombGeo = new THREE.IcosahedronGeometry(1.6, 0);
-  const bombMat = new THREE.MeshBasicMaterial({ color: 0xff7a1a });
-  let bombT = 3, smokeT = 0;
-  const clearBombs = () => { for (const b of bombs) { levelGroup.remove(b.ring, b.mesh); b.ring.material.dispose(); } bombs.length = 0; };
-  const dropBomb = (i, lat) => {
-    const to = new V3(TP[i].x + TS[i].x * lat, TP[i].y, TP[i].z + TS[i].z * lat);
-    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
-    ring.position.set(to.x, to.y + 0.08, to.z);
-    const mesh = new THREE.Mesh(bombGeo, bombMat);
-    levelGroup.add(ring, mesh);
-    bombs.push({ t: 0, dur: 2.6, from: top.clone(), to, ring, mesh });
-  };
-  return {
-    reset() { clearBombs(); bombT = 3; },
-    bomb: dropBomb, // online guests drop the bombs the host aims
-    update(dt, t) {
-      lavaTex.offset.set(t * 0.02, t * 0.015);
-      flowTex.offset.y = t * 0.08;
-      glow.intensity = 1.4 + Math.sin(t * 7) * 0.15 + Math.sin(t * 2.3) * 0.2;
-      // smoke plume and spray
-      smokeT -= dt;
-      if (smokeT <= 0) {
-        smokeT = 0.22;
-        emit(dust, top.x + rand(-10, 10), top.y + 5, top.z + rand(-10, 10), rand(-2, 2) + 4, rand(12, 18), rand(-2, 2), Math.random() < 0.5 ? 0x3a3036 : 0x55474a, 9, 90);
-      }
-      for (let q = 0; q < 2; q++) emit(sparks, top.x + rand(-12, 12), top.y, top.z + rand(-12, 12), rand(-18, 18), rand(35, 70), rand(-18, 18), Math.random() < 0.5 ? 0xff7a1a : 0xffd23f, 2.8, 12, 30);
-      // bombs aimed just ahead of racers
-      if (state === 'race' && karts.length && (!net || net.host)) {
-        bombT -= dt;
-        if (bombT <= 0) {
-          bombT = rand(1.6, 3.2);
-          const k = karts[Math.random() * karts.length | 0];
-          const i = wi(k.idx + Math.floor(rand(40, 80)));
-          const inTunnel = tunnel && i > tunnel.i0 - 20 && i < tunnel.i1 + 20;
-          if (!inTunnel) {
-            const lat = r2(rand(-HALF + 2, HALF - 2));
-            dropBomb(i, lat);
-            if (net) netSend({ t: 'bomb', r: net.race, i, lat });
-          }
-        }
-      }
-      for (let n = bombs.length - 1; n >= 0; n--) {
-        const b = bombs[n];
-        b.t += dt;
-        const u = Math.min(1, b.t / b.dur);
-        b.mesh.position.lerpVectors(b.from, b.to, u);
-        b.mesh.position.y += Math.sin(Math.PI * u) * 170;
-        b.mesh.rotation.x += dt * 5;
-        b.ring.material.opacity = 0.45 + 0.45 * Math.abs(Math.sin(t * 10));
-        b.ring.scale.setScalar(1.25 - 0.25 * u);
-        emit(sparks, b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, rand(-2, 2), rand(-2, 2), rand(-2, 2), 0xff7a1a, 0.6, 3);
-        if (u >= 1) {
-          for (let q = 0; q < 26; q++) emit(sparks, b.to.x, b.to.y + 1, b.to.z, rand(-12, 12), rand(6, 18), rand(-12, 12), q % 2 ? 0xff7a1a : 0xffd23f, 0.9, 2.2, 22);
-          for (let q = 0; q < 6; q++) emit(dust, b.to.x + rand(-3, 3), b.to.y + 1, b.to.z + rand(-3, 3), rand(-2, 2), rand(2, 5), rand(-2, 2), 0x3a3036, 1.6, 6);
-          if (player && player.pos.distanceTo(b.to) < 90) { sfx.boom(); if (player.pos.distanceTo(b.to) < 25) shake = 0.35; }
-          for (const k of karts) {
-            const dx = k.pos.x - b.to.x, dz = k.pos.z - b.to.z;
-            if (dx * dx + dz * dz < 5.8 * 5.8) hitKart(k, null);
-          }
-          levelGroup.remove(b.ring, b.mesh);
-          b.ring.material.dispose();
-          bombs.splice(n, 1);
-        }
-      }
-    },
-  };
 }
 
 // ---------- shared props for the Nigerian tracks
@@ -3707,6 +3265,98 @@ function decoPalmForest(E) {
   return { moving: [] };
 }
 
+function decoMangrove(E) {
+  const sc = L.scale;
+  const at = (x, z) => nearestOn(MAIN, x * sc, z * sc, 0, N - 1).i;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new V3(0, 1, 0), e = new THREE.Euler(), col = new THREE.Color();
+  // teal water everywhere with a slow swell, and low mud flats where the mangroves stand
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400, 40, 40).rotateX(-Math.PI / 2), new THREE.MeshPhongMaterial({ color: 0x1f7a78, specular: 0xbfe8f0, shininess: 70 }));
+  water.position.set(E.cx, 0, E.cz);
+  levelGroup.add(water);
+  const wp = water.geometry.attributes.position;
+  const flats = E.spots(40, WALL + 10, 260);
+  const flatMat = lambert({ color: 0x4a3a26 });
+  for (const [x, z] of flats) { const f = new THREE.Mesh(new THREE.CircleGeometry(rand(14, 30), 10).rotateX(-Math.PI / 2), flatMat); f.position.set(x, 0.25, z); levelGroup.add(f); }
+
+  // mangroves: dark twisted trees on stilt roots, thick along the corridor and out on the flats
+  const groves = [...roadside(E, MAIN, 10, 4, 12).filter(s => s[2] < 3).map(s => [s[0], s[1]]), ...flats.flatMap(([x, z]) => Array.from({ length: 4 }, () => [x + rand(-12, 12), z + rand(-12, 12)])), ...E.spots(160, WALL + 8, 260)];
+  addTrees(groves, { roundP: 1, hue: [0.3, 0.4], sat: [0.4, 0.6], lig: [0.13, 0.22], scale: [0.9, 1.6], trunk: 0x3a2a1a, y: 1.6 });
+  const roots = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.2, 3.6, 4).translate(0, 1.5, 0), lambert({ color: 0x3a2a1a }), groves.length * 4);
+  groves.forEach(([x, z], n) => {
+    for (let r = 0; r < 4; r++) {
+      const a = r / 4 * TAU + rand(-0.3, 0.3);
+      q.setFromEuler(e.set(Math.cos(a) * 0.65, 0, Math.sin(a) * 0.65));
+      roots.setMatrixAt(n * 4 + r, m.compose(new V3(x + Math.sin(a), -0.4, z - Math.cos(a)), q, new V3(1, 1, 1)));
+    }
+  });
+  levelGroup.add(roots);
+  // reeds in the shallows
+  const reedSpots = E.spots(260, WALL + 4, 160);
+  const reeds = new THREE.InstancedMesh(new THREE.ConeGeometry(0.25, 3, 4).translate(0, 1.5, 0), lambert({ color: 0xffffff, flatShading: true }), reedSpots.length * 3);
+  reedSpots.forEach(([x, z], n) => { for (let k = 0; k < 3; k++) { q.setFromEuler(e.set(rand(-0.2, 0.2), 0, rand(-0.2, 0.2))); reeds.setMatrixAt(n * 3 + k, m.compose(new V3(x + rand(-1, 1), 0, z + rand(-1, 1)), q, new V3(1, rand(0.7, 1.3), 1))); reeds.setColorAt(n * 3 + k, col.setHSL(rand(0.18, 0.28), 0.45, rand(0.3, 0.42))); } });
+  levelGroup.add(reeds);
+  // timber walkways off across the water, and fishing canoes
+  const wood = lambert({ map: canvasTex(PAINT.planks(), 1, 3) }), postMat = lambert({ color: 0x3a2a1a });
+  for (const [x, z] of E.spots(6, WALL + 20, 200)) {
+    const g = new THREE.Group(), len = rand(30, 60);
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(3, 0.4, len), wood); deck.position.set(0, 1.4, 0); g.add(deck);
+    for (let s = -len / 2; s <= len / 2; s += 6) for (const px of [-1.3, 1.3]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.4, 5), postMat); p.position.set(px, 0.3, s); g.add(p); }
+    g.position.set(x, 0, z); g.rotation.y = rand(0, TAU);
+    levelGroup.add(g);
+  }
+  const canoes = [];
+  for (let n = 0; n < 8; n++) {
+    const c = new THREE.Group();
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.7, 7), lambert({ color: 0x6a4424 })); hull.position.y = 0.25;
+    c.add(hull); levelGroup.add(c);
+    const [x, z] = E.spots(1, WALL + 30, 220)[0] || [E.cx, E.cz];
+    canoes.push({ c, x, z, ph: rand(0, TAU), r: rand(10, 30) });
+  }
+  // floating debris drifting on the current
+  const debris = E.spots(30, WALL + 3, 160).map(([x, z], n) => {
+    const mesh = n % 3 ? new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, rand(3, 6), 6).rotateZ(Math.PI / 2), postMat)
+      : new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 0), lambert({ color: 0x3f6a2a, flatShading: true }));
+    mesh.rotation.y = rand(0, TAU); levelGroup.add(mesh);
+    return { mesh, x, z, ph: rand(0, TAU), dir: rand(0, TAU) };
+  });
+
+  // ---- hazards: roots creeping onto the outside of bends, and mud
+  const rootMat = lambert({ color: 0x3a2a1a, flatShading: true });
+  [[150, -150], [175, -195], [140, -230], [45, -262], [-110, -235], [-150, -195], [-130, -150], [-165, -110]].forEach(([x, z]) => {
+    const i = at(x, z), a = TT[wi(i - 10)], b = TT[wi(i + 10)];
+    const side = (b.x - a.x) * TS[i].x + (b.z - a.z) * TS[i].z > 0 ? -1 : 1; // the outside of the bend
+    const g = new THREE.Group();
+    for (let k = 0; k < 4; k++) { const r = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.3, 5, 10, Math.PI), rootMat); r.position.set(rand(-0.6, 0.6), 0, (k - 1.5) * 0.9); r.rotation.y = Math.PI / 2 + rand(-0.5, 0.5); g.add(r); }
+    levelGroup.add(g);
+    addObstacle({ i, lat: side * (Math.min(HALF, side > 0 ? wallR[i] : wallL[i]) - 1.2), len: 4, w: 2.6, kind: 'root', mesh: g });
+  });
+  const mudMat = new THREE.MeshBasicMaterial({ map: canvasTex(makeCanvas(128, 64, (g, w, h) => {
+    const gr = g.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, w / 2);
+    gr.addColorStop(0, 'rgba(60,44,26,0.95)'); gr.addColorStop(0.75, 'rgba(78,58,34,0.85)'); gr.addColorStop(1, 'rgba(78,58,34,0)');
+    g.fillStyle = gr; g.beginPath(); g.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, TAU); g.fill();
+  })), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+  [[188, -85, -3], [160, -170, 4], [-85, -228, -4], [-140, -172, 3]].forEach(([x, z, lat]) => {
+    const i = at(x, z), mesh = new THREE.Mesh(new THREE.PlaneGeometry(9, 12).rotateX(-Math.PI / 2), mudMat);
+    mesh.position.y = 0.06; levelGroup.add(mesh);
+    addObstacle({ i, lat, len: 10, w: 8, kind: 'mud', mesh });
+  });
+
+  addClouds(E, 10, { emissive: 0x9ab0b8 });
+
+  let frameN = 0;
+  return {
+    moving: [water, ...canoes.map(c => c.c), ...debris.map(d => d.mesh)],
+    update(dt, t) {
+      if ((frameN++ & 1) === 0) {
+        for (let i = 0; i < wp.count; i++) wp.setY(i, Math.sin(wp.getX(i) * 0.03 + t * 0.8) * 0.12 + Math.cos(wp.getZ(i) * 0.025 + t * 0.6) * 0.12);
+        wp.needsUpdate = true;
+      }
+      for (const c of canoes) { const a = t * 0.04 + c.ph; c.c.position.set(c.x + Math.cos(a) * c.r, Math.sin(t * 1.3 + c.ph) * 0.1, c.z + Math.sin(a) * c.r); c.c.rotation.y = -a; }
+      for (const d of debris) d.mesh.position.set(d.x + Math.cos(d.dir) * Math.sin(t * 0.06 + d.ph) * 10, 0.12 + Math.sin(t * 1.4 + d.ph) * 0.1, d.z + Math.sin(d.dir) * Math.sin(t * 0.06 + d.ph) * 10);
+    },
+  };
+}
+
 const LEVELS = [
   {
     name: 'Danfo Dash', tag: 'Lagos · City circuit', band: 'linear-gradient(180deg,#FFC21F 0 50%,#4e5159 50%)',
@@ -3719,7 +3369,7 @@ const LEVELS = [
     sky: [0x4f9fe8, 0xffe6c2], fog: [260, 900], hemi: [0xfff4e0, 0x8a7a66, 0.95], sun: [0xffe2b0, 0.75],
     road: ['#4e5159', '#FFC21F', 'rgba(255,255,255,0.5)'], curb: ['#FFC21F', '#1B1330'], wall: ['#E8E4DA', '#FFC21F', '#1B1330'],
     arch: { post: 0x1B1330, bg: '#1B1330', text: '#FFC21F', stripe: '#2EC27E' },
-    shoulder: () => PAINT.pavement(), slab: 0xc9c1b2, base: 'flyover', deco: decoDanfo, dust: 0xb8ab98, theme: 4,
+    shoulder: () => PAINT.pavement(), slab: 0xc9c1b2, base: 'flyover', deco: decoDanfo, dust: 0xb8ab98, theme: 0,
     pads: [[0.06, 0], [0.55, -4], [0.72, 4], [0.95, 0]], boxes: [0.16, 0.53, 0.78],
   },
   {
@@ -3736,7 +3386,7 @@ const LEVELS = [
     sky: [0x5aa0e0, 0xd9ecf2], fog: [240, 850], hemi: [0xeaf6ff, 0x3f7f45, 0.95], sun: [0xfff3dc, 0.72],
     road: ['#4a4e57', '#FFFFFF', 'rgba(255,210,63,0.6)'], curb: ['#E8762A', '#FFFFFF'], wall: ['#F4F6FF', '#2EC27E', '#1B1330'],
     arch: { post: 0x0f5a3a, bg: '#0f5a3a', text: '#FFFFFF', stripe: '#E8762A' },
-    shoulder: () => PAINT.pavement('#c4c0b4', '#a8a497'), slab: 0xc9c5ba, base: 'flyover', deco: decoGarden, dust: 0x6a8a50, theme: 5,
+    shoulder: () => PAINT.pavement('#c4c0b4', '#a8a497'), slab: 0xc9c5ba, base: 'flyover', deco: decoGarden, dust: 0x6a8a50, theme: 1,
     pads: [[0.07, 0], [0.33, 0], [0.63, -4], [0.95, 0]], boxes: [0.2, 0.5, 0.86],
   },
   {
@@ -3755,7 +3405,7 @@ const LEVELS = [
     sky: [0x4a9fd8, 0xe9f3e0], fog: [240, 850], hemi: [0xf2fbff, 0x2f6b4a, 0.95], sun: [0xfff0d0, 0.75],
     road: ['#57524a', '#FFE7B0', 'rgba(255,255,255,0.4)'], curb: ['#C2410C', '#FFF4E0'], wall: ['#A8743F', '#C49160', '#4a3020'],
     arch: { post: 0x5a3a1a, bg: '#0f4d4d', text: '#FFD23F', stripe: '#C2410C' },
-    shoulder: () => PAINT.gravel('#b88a5a', ['#a87a4a', '#c99a6a', '#9a6c40']), slab: 0x9a8c76, base: 'flyover', deco: decoDelta, dust: 0x8a6a40, theme: 6,
+    shoulder: () => PAINT.gravel('#b88a5a', ['#a87a4a', '#c99a6a', '#9a6c40']), slab: 0x9a8c76, base: 'flyover', deco: decoDelta, dust: 0x8a6a40, theme: 2,
     pads: [[0.1, 0], [0.4, 0], [0.72, 0], [0.95, 0]], boxes: [0.2, 0.55, 0.85],
   },
   {
@@ -3775,7 +3425,7 @@ const LEVELS = [
     sky: [0x4f9fe0, 0xe2eef6], fog: [300, 1100], hemi: [0xf4fbff, 0x6a7a3a, 0.95], sun: [0xfff2d8, 0.75],
     road: ['#4d5058', '#FFFFFF', 'rgba(255,210,63,0.75)'], curb: ['#E8363C', '#FFFFFF'], wall: ['#E8E6E0', '#9aa0a8', '#4a4a4a'],
     arch: { post: 0x0f6b3a, bg: '#0f6b3a', text: '#FFFFFF', stripe: '#E8363C' },
-    shoulder: () => PAINT.gravel('#9c5a3c', ['#8a4e34', '#ab6a4a', '#7d462e']), base: 'ground', deco: decoZuma, dust: 0xa0522d, theme: 7,
+    shoulder: () => PAINT.gravel('#9c5a3c', ['#8a4e34', '#ab6a4a', '#7d462e']), base: 'ground', deco: decoZuma, dust: 0xa0522d, theme: 3,
     pads: [[0.06, 0], [0.3, 0], [0.82, 0], [0.92, 0]], boxes: [0.15, 0.48, 0.75],
   },
   {
@@ -3792,8 +3442,27 @@ const LEVELS = [
     sky: [0x5aa2e0, 0xf3e8d2], fog: [260, 900], hemi: [0xfff4e0, 0x5a4a2a, 0.95], sun: [0xffe4b8, 0.75],
     road: ['#5a4a44', '#F3E5C0', 'rgba(212,160,23,0.7)'], curb: ['#D4A017', '#8B1E1E'], wall: ['#8B1E1E', '#A52A2A', '#D4A017'],
     arch: { post: 0x8B1E1E, bg: '#8B1E1E', text: '#D4A017', stripe: '#F3E5C0' },
-    shoulder: () => PAINT.pavement('#E9DCC0', '#C9B48A'), base: 'ground', deco: decoBronze, dust: 0xC9B48A, theme: 8,
+    shoulder: () => PAINT.pavement('#E9DCC0', '#C9B48A'), base: 'ground', deco: decoBronze, dust: 0xC9B48A, theme: 4,
     pads: [[0.08, 0], [0.32, 0], [0.72, 0], [0.95, 0]], boxes: [0.18, 0.55, 0.9],
+  },
+  {
+    name: 'Olumo Rock Rush', tag: 'Abeokuta · Rock circuit', band: 'linear-gradient(180deg,#f2c46a 0 30%,#9a9088 30% 62%,#b0603a 62%)',
+    scale: 1.5, groundY: 0, hills: true, stoneEdges: true,
+    cp: [[-60, 0, 1], [40, 0, 1], [100, -10, 3], [150, -45, 7], [165, -100, 11], [145, -155, 15], [95, -180, 18], [40, -165, 20], [0, -140, 20],
+      [-40, -150, 19], [-90, -160, 17], [-122, -153, 16], [-136, -133, 15], [-122, -115, 14], [-90, -112, 13], [-45, -106, 11],
+      [-22, -96, 10], [-16, -77, 9], [-32, -62, 8], [-80, -58, 6], [-125, -53, 5], [-150, -42, 4], [-155, -22, 3], [-138, -8, 2], [-100, -3, 1]],
+    // a cave through the rock formation that cuts off the big climbing curve
+    branches: [{ from: [150, -45], to: [95, -180], cp: [[128, -80, 10], [118, -120, 13], [108, -158, 16]], half: 4.5, ai: 0.4 }],
+    branchLook: { road: ['#6a5a50', 'rgba(255,255,255,0.4)', 'rgba(0,0,0,0)'], wall: ['#9a9088', '#7f776e', '#5a544e'], shoulder: () => PAINT.gravel('#8a7a6a', ['#7a6a5a', '#9a8a7a']) },
+    // tight rock corridors: through the arch and round the switchbacks
+    narrow: [{ from: [62, -172], to: [-12, -142], wall: 14 }, { from: [-80, -160], to: [-80, -112], wall: 14 },
+      { from: [-35, -106], to: [-45, -60], wall: 14 }, { from: [-118, -55], to: [-125, -5], wall: 14 }],
+    gravel: [[[-100, -160], [-100, -113], 'outer'], [[-135, -50], [-128, -6], 'outer']],
+    sky: [0x5aa6e8, 0xfbe6c4], fog: [260, 950], hemi: [0xfff3dc, 0x6a5a3a, 0.95], sun: [0xffdca0, 0.8],
+    road: ['#6a4e40', '#F3E5C0', 'rgba(255,255,255,0.45)'], curb: ['#a39a90', '#7f776e'], wall: ['#d9cfc2', '#b0603a', '#5a544e'],
+    arch: { post: 0x5a544e, bg: '#b0603a', text: '#FFFFFF', stripe: '#F3E5C0' },
+    shoulder: () => PAINT.gravel('#b0603a', ['#9a5232', '#c27048', '#8a4a2c']), base: 'ground', deco: decoOlumo, dust: 0xb0603a, theme: 6,
+    pads: [[0.05, 0], [0.3, 0], [0.58, 0], [0.92, 0]], boxes: [0.12, 0.47, 0.8],
   },
   {
     name: 'Plateau Peak Rally', tag: 'Jos · Highland circuit', band: 'linear-gradient(180deg,#8fb0d0 0 35%,#6f7178 35% 55%,#4f9a45 55%)',
@@ -3814,60 +3483,8 @@ const LEVELS = [
     sky: [0x6f9fd8, 0xc8daea], fogColor: 0xb8cce0, fog: [240, 900], hemi: [0xeef6ff, 0x5a6a3a, 0.95], sun: [0xfff4e0, 0.72],
     road: ['#55585f', '#FFFFFF', 'rgba(255,210,63,0.7)'], curb: ['#FFFFFF', '#2EC27E'], wall: ['#E8E6E0', '#9aa0a8', '#4a4a4a'],
     arch: { post: 0x2f5a3a, bg: '#2f5a3a', text: '#FFFFFF', stripe: '#FFD23F' },
-    shoulder: () => PAINT.gravel('#8a8a5a', ['#7a7a4a', '#9a9a6a', '#6a6a44']), base: 'ground', deco: decoPlateau, dust: 0x9a8a6a, theme: 9,
+    shoulder: () => PAINT.gravel('#8a8a5a', ['#7a7a4a', '#9a9a6a', '#6a6a44']), base: 'ground', deco: decoPlateau, dust: 0x9a8a6a, theme: 5,
     pads: [[0.06, 0], [0.4, 0], [0.75, 0], [0.9, 0]], boxes: [0.11, 0.5, 0.8],
-  },
-  {
-    name: 'Olumo Rock Rush', tag: 'Abeokuta · Rock circuit', band: 'linear-gradient(180deg,#f2c46a 0 30%,#9a9088 30% 62%,#b0603a 62%)',
-    scale: 1.5, groundY: 0, hills: true, stoneEdges: true,
-    cp: [[-60, 0, 1], [40, 0, 1], [100, -10, 3], [150, -45, 7], [165, -100, 11], [145, -155, 15], [95, -180, 18], [40, -165, 20], [0, -140, 20],
-      [-40, -150, 19], [-90, -160, 17], [-122, -153, 16], [-136, -133, 15], [-122, -115, 14], [-90, -112, 13], [-45, -106, 11],
-      [-22, -96, 10], [-16, -77, 9], [-32, -62, 8], [-80, -58, 6], [-125, -53, 5], [-150, -42, 4], [-155, -22, 3], [-138, -8, 2], [-100, -3, 1]],
-    // a cave through the rock formation that cuts off the big climbing curve
-    branches: [{ from: [150, -45], to: [95, -180], cp: [[128, -80, 10], [118, -120, 13], [108, -158, 16]], half: 4.5, ai: 0.4 }],
-    branchLook: { road: ['#6a5a50', 'rgba(255,255,255,0.4)', 'rgba(0,0,0,0)'], wall: ['#9a9088', '#7f776e', '#5a544e'], shoulder: () => PAINT.gravel('#8a7a6a', ['#7a6a5a', '#9a8a7a']) },
-    // tight rock corridors: through the arch and round the switchbacks
-    narrow: [{ from: [62, -172], to: [-12, -142], wall: 14 }, { from: [-80, -160], to: [-80, -112], wall: 14 },
-      { from: [-35, -106], to: [-45, -60], wall: 14 }, { from: [-118, -55], to: [-125, -5], wall: 14 }],
-    gravel: [[[-100, -160], [-100, -113], 'outer'], [[-135, -50], [-128, -6], 'outer']],
-    sky: [0x5aa6e8, 0xfbe6c4], fog: [260, 950], hemi: [0xfff3dc, 0x6a5a3a, 0.95], sun: [0xffdca0, 0.8],
-    road: ['#6a4e40', '#F3E5C0', 'rgba(255,255,255,0.45)'], curb: ['#a39a90', '#7f776e'], wall: ['#d9cfc2', '#b0603a', '#5a544e'],
-    arch: { post: 0x5a544e, bg: '#b0603a', text: '#FFFFFF', stripe: '#F3E5C0' },
-    shoulder: () => PAINT.gravel('#b0603a', ['#9a5232', '#c27048', '#8a4a2c']), base: 'ground', deco: decoOlumo, dust: 0xb0603a, theme: 10,
-    pads: [[0.05, 0], [0.3, 0], [0.58, 0], [0.92, 0]], boxes: [0.12, 0.47, 0.8],
-  },
-  {
-    name: 'Sacred Grove Sprint', tag: 'Osogbo · Forest circuit', band: 'linear-gradient(180deg,#f2d27a 0 25%,#2f7a3a 25% 70%,#3aa58a 70%)',
-    scale: 1.5, groundY: 0,
-    cp: [[-60, 0, 0], [30, 0, 0], [90, -25, 0], [120, -75, 0], [95, -120, 0], [125, -165, 0], [100, -210, 1], [48, -232, 4],
-      [-20, -232, 4], [-75, -224, 1], [-145, -215, 0], [-188, -168, 0], [-170, -112, 0], [-124, -88, 0], [-130, -58, 0], [-152, -34, 0], [-138, -10, 0], [-105, -2, 0]],
-    // a narrow woodland path straight through the clearing, twisting between the trees
-    branches: [{ from: [-80, -223], to: [-168, -106], cp: [[-96, -201], [-97, -181], [-111, -166], [-115, -147], [-136, -127]], half: 4, ai: 0.4 }],
-    branchLook: { road: ['#7a5a3a', 'rgba(0,0,0,0)', 'rgba(0,0,0,0)'], wall: ['#8a5a2a', '#6a4a22', '#3a2a14'], shoulder: () => PAINT.gravel('#3a5a2a', ['#2f4a24', '#4a6a34']) },
-    canopy: [[[25, 0], [100, -205]], [[-168, -108], [-122, -10]]],
-    narrow: [{ from: [55, -232], to: [-27, -232], wall: 12.8 }],
-    sky: [0x6fb0d8, 0xe8f0c8], fog: [240, 820], hemi: [0xfff4d8, 0x2f5a2a, 0.9], sun: [0xffe2a0, 0.8],
-    road: ['#6a5040', '#E8D8A8', 'rgba(255,230,160,0.4)'], curb: ['#8a5a2a', '#E8D8A8'], wall: ['#8a5a2a', '#a8743f', '#3a2a14'],
-    arch: { post: 0x5a3a22, bg: '#2f5a3a', text: '#f2d27a', stripe: '#3aa58a' },
-    shoulder: () => PAINT.gravel('#4a5a2a', ['#3a4a22', '#5a6a34', '#6a5030']), slab: 0x8a7a64, base: 'flyover', deco: decoGrove, dust: 0x6a5a3a, theme: 11,
-    pads: [[0.06, 0], [0.35, 0], [0.62, 0], [0.94, 0]], boxes: [0.15, 0.56, 0.8],
-  },
-  {
-    name: 'Carnival Chaos', tag: 'Calabar · Festival circuit', band: 'linear-gradient(90deg,#ff3fa8,#ff8a1f,#ffd23f,#2ee6d6,#9a4dff)',
-    scale: 1.5, groundY: 0,
-    cp: [[-60, 0, 0], [60, 0, 0], [170, 0, 0], [230, -30, 0], [250, -90, 0], [215, -140, 0], [240, -195, 0], [200, -245, 0],
-      [155, -212, 0], [118, -200, 0], [98, -214, 0], [78, -200, 0], [45, -210, 0], [10, -238, 0],
-      [-50, -230, 0], [-110, -190, 0], [-130, -120, 0], [-125, -50, 0], [-100, -10, 0]],
-    // a backstage service lane behind the plaza, with a narrow way in
-    branches: [{ from: [196, -250], to: [8, -241], cp: [[170, -262], [110, -266], [50, -258]], half: 3.8, ai: 0.4 }],
-    branchLook: { road: ['#4a4450', 'rgba(255,255,255,0.4)', 'rgba(0,0,0,0)'], wall: ['#3a3a48', '#5a5a68', '#ff3fa8'], shoulder: () => PAINT.pavement('#8a7a88', '#6a5a68') },
-    narrow: [{ from: [140, -206], to: [35, -214], wall: 14 }], // the plaza's chicane, between festival barriers
-    sky: [0x3a2a8a, 0xffa07a], fogColor: 0xf0a0b0, fog: [260, 900], hemi: [0xffe0f0, 0x6a3a6a, 0.95], sun: [0xffc890, 0.8],
-    road: ['#4a4450', '#ffd23f', 'rgba(46,230,214,0.7)'], curb: ['#ff3fa8', '#FFFFFF'], wall: ['#9a4dff', '#ffd23f', '#2a1a4a'],
-    arch: { post: 0x9a4dff, bg: '#2a1a4a', text: '#ffd23f', stripe: '#ff3fa8' },
-    shoulder: () => PAINT.pavement('#e8c8d8', '#c8a0b8'), base: 'ground', deco: decoCarnival, dust: 0xffb3d9, theme: 12,
-    // festival boost zones: cross inside the glowing band for a boost
-    pads: [[0.07, -6, 'fest'], [0.3, 6, 'fest'], [0.62, 0, 'fest'], [0.86, 5, 'fest']], boxes: [0.16, 0.46, 0.75],
   },
   {
     name: 'Savannah Stampede', tag: 'Yankari · Savannah circuit', band: 'linear-gradient(180deg,#a8d0e8 0 40%,#c9a24a 40% 75%,#6a7a3a 75%)',
@@ -3883,7 +3500,7 @@ const LEVELS = [
     sky: [0x6aa8d8, 0xf2e2c0], fogColor: 0xe8d8b0, fog: [280, 1000], hemi: [0xfff4d8, 0x8a7a40, 0.95], sun: [0xffe0a8, 0.8],
     road: ['#8a7a68', '#f2e2c0', 'rgba(255,255,255,0.35)'], curb: ['#c9a24a', '#6a4a2a'], wall: ['#a8743f', '#c49160', '#4a3020'],
     arch: { post: 0x6a4a2a, bg: '#6a4a2a', text: '#f2c46a', stripe: '#6a7a3a' },
-    shoulder: () => PAINT.gravel('#b8913e', ['#a88a3e', '#c9a24a', '#8a7a3a']), slab: 0x9a8a72, base: 'flyover', deco: decoSavannah, dust: 0xc4a070, theme: 13,
+    shoulder: () => PAINT.gravel('#b8913e', ['#a88a3e', '#c9a24a', '#8a7a3a']), slab: 0x9a8a72, base: 'flyover', deco: decoSavannah, dust: 0xc4a070, theme: 9,
     pads: [[0.05, 0], [0.22, 0], [0.58, 0], [0.9, 0]], boxes: [0.2, 0.5, 0.78],
   },
   {
@@ -3901,8 +3518,41 @@ const LEVELS = [
     sky: [0x3a9ae8, 0xd8f4ff], fog: [300, 1100], hemi: [0xf4fcff, 0xc8a878, 0.95], sun: [0xfff2d8, 0.8],
     road: ['#5a5e66', '#FFFFFF', 'rgba(255,111,90,0.75)'], curb: ['#ff6f5a', '#FFFFFF'], wall: ['#FFFFFF', '#2e9aa8', '#1b4f6a'],
     arch: { post: 0x2e9aa8, bg: '#1b4f6a', text: '#FFFFFF', stripe: '#ff6f5a' },
-    shoulder: () => PAINT.gravel('#e8d4a2', ['#dcc690', '#f2e2b8', '#d2bc88']), slab: 0x8a6a42, base: 'flyover', deco: decoCoast, dust: 0xf0e0b8, theme: 14,
+    shoulder: () => PAINT.gravel('#e8d4a2', ['#dcc690', '#f2e2b8', '#d2bc88']), slab: 0x8a6a42, base: 'flyover', deco: decoCoast, dust: 0xf0e0b8, theme: 10,
     pads: [[0.06, 0], [0.3, 0], [0.62, 0], [0.88, 0]], boxes: [0.15, 0.45, 0.78],
+  },
+  {
+    name: 'Sacred Grove Sprint', tag: 'Osogbo · Forest circuit', band: 'linear-gradient(180deg,#f2d27a 0 25%,#2f7a3a 25% 70%,#3aa58a 70%)',
+    scale: 1.5, groundY: 0,
+    cp: [[-60, 0, 0], [30, 0, 0], [90, -25, 0], [120, -75, 0], [95, -120, 0], [125, -165, 0], [100, -210, 1], [48, -232, 4],
+      [-20, -232, 4], [-75, -224, 1], [-145, -215, 0], [-188, -168, 0], [-170, -112, 0], [-124, -88, 0], [-130, -58, 0], [-152, -34, 0], [-138, -10, 0], [-105, -2, 0]],
+    // a narrow woodland path straight through the clearing, twisting between the trees
+    branches: [{ from: [-80, -223], to: [-168, -106], cp: [[-96, -201], [-97, -181], [-111, -166], [-115, -147], [-136, -127]], half: 4, ai: 0.4 }],
+    branchLook: { road: ['#7a5a3a', 'rgba(0,0,0,0)', 'rgba(0,0,0,0)'], wall: ['#8a5a2a', '#6a4a22', '#3a2a14'], shoulder: () => PAINT.gravel('#3a5a2a', ['#2f4a24', '#4a6a34']) },
+    canopy: [[[25, 0], [100, -205]], [[-168, -108], [-122, -10]]],
+    narrow: [{ from: [55, -232], to: [-27, -232], wall: 12.8 }],
+    sky: [0x6fb0d8, 0xe8f0c8], fog: [240, 820], hemi: [0xfff4d8, 0x2f5a2a, 0.9], sun: [0xffe2a0, 0.8],
+    road: ['#6a5040', '#E8D8A8', 'rgba(255,230,160,0.4)'], curb: ['#8a5a2a', '#E8D8A8'], wall: ['#8a5a2a', '#a8743f', '#3a2a14'],
+    arch: { post: 0x5a3a22, bg: '#2f5a3a', text: '#f2d27a', stripe: '#3aa58a' },
+    shoulder: () => PAINT.gravel('#4a5a2a', ['#3a4a22', '#5a6a34', '#6a5030']), slab: 0x8a7a64, base: 'flyover', deco: decoGrove, dust: 0x6a5a3a, theme: 7,
+    pads: [[0.06, 0], [0.35, 0], [0.62, 0], [0.94, 0]], boxes: [0.15, 0.56, 0.8],
+  },
+  {
+    name: 'Carnival Chaos', tag: 'Calabar · Festival circuit', band: 'linear-gradient(90deg,#ff3fa8,#ff8a1f,#ffd23f,#2ee6d6,#9a4dff)',
+    scale: 1.5, groundY: 0,
+    cp: [[-60, 0, 0], [60, 0, 0], [170, 0, 0], [230, -30, 0], [250, -90, 0], [215, -140, 0], [240, -195, 0], [200, -245, 0],
+      [155, -212, 0], [118, -200, 0], [98, -214, 0], [78, -200, 0], [45, -210, 0], [10, -238, 0],
+      [-50, -230, 0], [-110, -190, 0], [-130, -120, 0], [-125, -50, 0], [-100, -10, 0]],
+    // a backstage service lane behind the plaza, with a narrow way in
+    branches: [{ from: [196, -250], to: [8, -241], cp: [[170, -262], [110, -266], [50, -258]], half: 3.8, ai: 0.4 }],
+    branchLook: { road: ['#4a4450', 'rgba(255,255,255,0.4)', 'rgba(0,0,0,0)'], wall: ['#3a3a48', '#5a5a68', '#ff3fa8'], shoulder: () => PAINT.pavement('#8a7a88', '#6a5a68') },
+    narrow: [{ from: [140, -206], to: [35, -214], wall: 14 }], // the plaza's chicane, between festival barriers
+    sky: [0x3a2a8a, 0xffa07a], fogColor: 0xf0a0b0, fog: [260, 900], hemi: [0xffe0f0, 0x6a3a6a, 0.95], sun: [0xffc890, 0.8],
+    road: ['#4a4450', '#ffd23f', 'rgba(46,230,214,0.7)'], curb: ['#ff3fa8', '#FFFFFF'], wall: ['#9a4dff', '#ffd23f', '#2a1a4a'],
+    arch: { post: 0x9a4dff, bg: '#2a1a4a', text: '#ffd23f', stripe: '#ff3fa8' },
+    shoulder: () => PAINT.pavement('#e8c8d8', '#c8a0b8'), base: 'ground', deco: decoCarnival, dust: 0xffb3d9, theme: 8,
+    // festival boost zones: cross inside the glowing band for a boost
+    pads: [[0.07, -6, 'fest'], [0.3, 6, 'fest'], [0.62, 0, 'fest'], [0.86, 5, 'fest']], boxes: [0.16, 0.46, 0.75],
   },
   {
     name: 'Palm Forest Rally', tag: 'Plantation · Forest circuit', band: 'linear-gradient(180deg,#f2d27a 0 25%,#1f6a2a 25% 70%,#8a3e22 70%)',
@@ -3921,50 +3571,40 @@ const LEVELS = [
     sky: [0x6aa8d8, 0xf2e8c8], fog: [220, 820], hemi: [0xfff4d8, 0x3a5a22, 0.9], sun: [0xffe0a0, 0.8],
     road: ['#7a6a5a', '#f2e2c0', 'rgba(255,255,255,0.35)'], curb: ['#8a3e22', '#f2e2c0'], wall: ['#6a4a2a', '#a8743f', '#3a2a14'],
     arch: { post: 0x5a3a22, bg: '#1f5a2a', text: '#f2d27a', stripe: '#d2491e' },
-    shoulder: () => PAINT.gravel('#7a3a22', ['#6a3020', '#8a4a2a', '#4a5a22']), base: 'ground', deco: decoPalmForest, dust: 0x9a4a2a, theme: 15,
+    shoulder: () => PAINT.gravel('#7a3a22', ['#6a3020', '#8a4a2a', '#4a5a22']), base: 'ground', deco: decoPalmForest, dust: 0x9a4a2a, theme: 11,
     pads: [[0.05, 0], [0.18, 0], [0.75, 0], [0.96, 0]], boxes: [0.15, 0.55, 0.88],
   },
   {
-    name: 'Pepper Hill', tag: 'Rolling green hills', band: 'linear-gradient(180deg,#8FD3F5 0 55%,#62B84A 55%)',
+    name: 'Mangrove Mayhem', tag: 'Niger Delta · Wetland circuit', band: 'linear-gradient(180deg,#9ac8d8 0 30%,#1f4a2a 30% 65%,#1f7a78 65% 85%,#5a4026 85%)',
     scale: 1.5, groundY: 0,
-    cp: [[-60, 0], [40, 0], [120, 0], [180, -20], [210, -80], [190, -140], [130, -160], [80, -130], [40, -150], [0, -200],
-      [-60, -210], [-120, -180], [-150, -120], [-200, -90], [-240, -40], [-220, 20], [-160, 40], [-110, 20]],
-    sky: [0x3b8fe3, 0xcdeeff], fog: [240, 800], hemi: [0xeaf6ff, 0x4f7f35, 0.9], sun: [0xfff4e0, 0.7],
-    road: ['#51555f', '#f2f2f2', 'rgba(255,255,255,0.4)'], curb: ['#E8363C', '#FFFFFF'], wall: ['#2D6BFF', '#F4F6FF', '#1B1330'],
-    arch: { post: 0x1B1330, bg: '#1B1330', text: '#FFD23F', stripe: '#E8363C' },
-    shoulder: null, base: 'ground', deco: decoHills, theme: 0,
-  },
-  {
-    name: 'Cloud Nine Skyway', tag: 'A road above the clouds', band: 'linear-gradient(180deg,#7C8CFF 0%,#FFDDEE 100%)',
-    scale: 1.4, groundY: -90,
-    cp: [[0, 0, 0], [120, 0, 6], [220, 30, 18], [260, 110, 28], [210, 180, 22], [120, 170, 12], [60, 110, 6], [-10, 140, 12],
-      [-90, 200, 24], [-180, 170, 32], [-220, 90, 24], [-180, 20, 12], [-100, -10, 4]],
-    sky: [0x6f7dff, 0xffddee], fog: [280, 1000], hemi: [0xffffff, 0xc9b8ff, 1.0], sun: [0xfff0f8, 0.55],
-    road: ['#2E2766', '#FFD23F', 'rgba(255,255,255,0.55)'], curb: ['#FF6FB5', '#FFFFFF'], wall: ['#FFD23F', '#FFFFFF', '#FF6FB5'],
-    arch: { post: 0xFF6FB5, bg: '#2E2766', text: '#FFFFFF', stripe: '#FFD23F' },
-    shoulder: () => PAINT.cloud('rgba(255,200,230,0.6)'), slab: 0xd9ccff, base: 'slab', deco: decoSky, dust: 0xffffff, theme: 1,
-  },
-  {
-    name: 'Coral Causeway', tag: 'A bridge over the sea', band: 'linear-gradient(180deg,#8FD3F5 0 50%,#1B9DC4 50%)',
-    scale: 1.35, groundY: 0,
-    cp: [[0, 0, 3], [140, -10, 3], [230, 40, 6], [250, 140, 10], [180, 210, 6], [80, 190, 3], [20, 250, 5], [-80, 260, 9],
-      [-160, 190, 5], [-150, 100, 3], [-220, 40, 6], [-170, -40, 4], [-80, -40, 3]],
-    sky: [0x1f86e0, 0xc4f4ff], fog: [260, 900], hemi: [0xf2fbff, 0x2a8fa0, 0.9], sun: [0xfff1c9, 0.8],
-    road: ['#555a63', '#ffffff', 'rgba(255,210,63,0.7)'], curb: ['#FFD23F', '#1B4F8A'], wall: ['#FFFFFF', '#E8363C', '#1B1330'],
-    arch: { post: 0xffffff, bg: '#1B4F8A', text: '#FFFFFF', stripe: '#FFD23F' },
-    shoulder: () => PAINT.planks(), slab: 0xcfc6b8, base: 'slab', deco: decoSea, dust: 0xc49160, theme: 2,
-  },
-  {
-    name: 'Magma Mountain', tag: 'An erupting volcano', band: 'linear-gradient(180deg,#B4452A 0%,#1A0710 100%)',
-    scale: 1.3, groundY: -1.5, volcano: [70, -110], tunnel: [0.6, 0.7],
-    cp: [[0, 0, 0], [130, 0, 3], [220, -50, 10], [240, -150, 20], [170, -220, 28], [60, -230, 32], [-40, -190, 28], [-80, -110, 20],
-      [-160, -80, 14], [-230, -130, 10], [-280, -60, 6], [-230, 20, 2], [-120, 30, 0]],
-    sky: [0x1a0710, 0xb4452a], fogColor: 0x8a3320, fog: [110, 720], hemi: [0xffc0a0, 0x401008, 0.85], sun: [0xff9a5a, 0.7],
-    road: ['#3b3a40', '#FF8A1F', 'rgba(255,138,31,0.5)'], curb: ['#FF5A1F', '#1B1330'], wall: ['#1B1330', '#FF8A1F', '#FFD23F'],
-    arch: { post: 0x1B1330, bg: '#1B1330', text: '#FF8A1F', stripe: '#FFD23F' },
-    shoulder: () => PAINT.gravel('#4a4044', ['#3a3034', '#5a4e50', '#6a4030']), base: 'embank', deco: decoVolcano, dust: 0x5a4e50, theme: 3,
+    cp: [[-60, 0, 6], [60, 0, 6], [140, -15, 5], [185, -55, 2], [190, -105, 1], [150, -150, 1], [175, -195, 1], [140, -230, 2],
+      [110, -234, 4], [72, -240, 4], [45, -262, 2], [20, -246, 4], [-20, -232, 4], [-60, -215, 1],
+      [-110, -235, 1], [-150, -195, 1], [-130, -150, 1], [-165, -110, 1], [-150, -60, 3], [-110, -15, 6]],
+    // a short boardwalk across the shallows, cutting the corridor's big bend
+    branches: [{ from: [188, -92], to: [172, -188], cp: [[192, -125, 1.6], [190, -158, 1.6]], half: 3.6, planks: true, ai: 0.4 }],
+    branchLook: { wall: ['#6a4a2a', '#8a6a42', '#3a2a14'], shoulder: () => PAINT.planks(), deck: 0x3a2a1a },
+    // timber on the two bridges; boardwalk-narrow there and through the corridor's tightest bends
+    planks: [[[112, -234], [70, -240]], [[22, -246], [-22, -232]]],
+    narrow: [{ from: [114, -234], to: [68, -240], wall: 11 }, { from: [24, -246], to: [-24, -232], wall: 11 }, { from: [186, -70], to: [142, -230], wall: 14 }],
+    wet: [[[-60, -215], [-165, -110]], [[160, -145], [178, -200]]], wetGrip: 0.45, // slick bends
+    sky: [0x7aaac8, 0xcfe4e0], fogColor: 0xbcd4d0, fog: [180, 760], hemi: [0xe8f4f0, 0x2a4a2a, 0.9], sun: [0xfff0d0, 0.7],
+    road: ['#4e524e', '#d8e8d0', 'rgba(255,255,255,0.35)'], curb: ['#5a4026', '#d8e8d0'], wall: ['#6a4a2a', '#8a6a42', '#3a2a14'],
+    arch: { post: 0x3a2a1a, bg: '#1f4a2a', text: '#9ae0d0', stripe: '#5a4026' },
+    shoulder: () => PAINT.gravel('#4a3a26', ['#3a2e1e', '#5a4830', '#2f4a2a']), slab: 0x5a4a36, base: 'flyover', deco: decoMangrove, dust: 0x5a4026, theme: 12,
+    pads: [[0.05, 0], [0.37, 0], [0.62, 0], [0.92, 0]], boxes: [0.15, 0.48, 0.76],
   },
 ];
+
+// The four cups, in the order they're played: from familiar city racing to the most demanding
+// environments. Finishing a track in the top 3 unlocks the next one, across all four cups.
+const CUPS = [
+  { name: 'Naija Street Cup', short: 'Naija Street', tag: 'Accessible, traffic-focused racing', tracks: [0, 1, 2] },
+  { name: 'Legends of the Land Cup', short: 'Legends of the Land', tag: 'Landmarks and technical turns', tracks: [3, 4, 5] },
+  { name: "Nature's Challenge Cup", short: "Nature's Challenge", tag: 'Elevation, grip changes and off-road racing', tracks: [6, 7, 8] },
+  { name: 'Culture & Wildways Cup', short: 'Culture & Wildways', tag: 'Environmental variety and advanced shortcuts', tracks: [9, 10, 11, 12] },
+];
+const cupOf = i => CUPS.findIndex(c => c.tracks.includes(i));
+const raceLabel = i => { const c = CUPS[cupOf(i)]; return `${c.short} · Race ${c.tracks.indexOf(i) + 1}`; };
 
 function buildLevel(li) {
   levelIdx = li; L = LEVELS[li];
@@ -4023,7 +3663,7 @@ function buildLevel(li) {
     for (let j = -6; j <= 6; j++) { l += minL[wi(i + j)]; r += minR[wi(i + j)]; }
     wallL[i] = l / 13; wallR[i] = r / 13;
   }
-  tunnel = L.tunnel ? { i0: Math.floor(L.tunnel[0] * N), i1: Math.floor(L.tunnel[1] * N) } : null;
+  tunnel = null;
   MAIN = { id: 0, P: TP, T: TT, S: TS, n: N, loop: true, half: HALF, wL: wallL, wR: wallR, slope: SLOPE, seg: SEG, jumps: mainJumps };
   const near = ([x, z]) => nearestOn(MAIN, x * L.scale, z * L.scale, 0, N - 1).i;
   // narrow sections (bridges): barriers pulled in to `wall`, easing back out over 25 samples each end
@@ -4154,12 +3794,7 @@ function buildLevel(li) {
       }
     }
   }
-  if (L.base === 'slab') {
-    const slabMat = lambert({ color: L.slab, side: THREE.DoubleSide });
-    ribbon(j => -wallL[j], j => -wallL[j], 0, -2, 6, slabMat);
-    ribbon(j => wallR[j], j => wallR[j], 0, -2, 6, slabMat);
-    ribbon(j => -wallL[j], j => wallR[j], -2, -2, 6, slabMat);
-  } else if (L.base === 'flyover') {
+  if (L.base === 'flyover') {  } else if (L.base === 'flyover') {
     // where the road rises off the ground: a deck edge on pillars, solid sides on the low ramps
     const deck = lambert({ color: L.slab, side: THREE.DoubleSide });
     const down = j => TP[j].y < 0.3 ? -0.3 : TP[j].y < 4 ? -TP[j].y - 0.1 : -1.4;
@@ -4178,12 +3813,6 @@ function buildLevel(li) {
       cap.setMatrixAt(n, m.compose(new V3(TP[j].x, top - 0.6, TP[j].z), q, new V3((wallL[j] + wallR[j]) * 0.8, 1, 1)));
     });
     levelGroup.add(pier, cap);
-  } else if (L.base === 'embank') {
-    const G = L.groundY;
-    const w = j => Math.max(3, (TP[j].y - G) * 1.5 + 3);
-    const bankMat = lambert({ map: canvasTex(PAINT.gravel('#35292b', ['#2a2022', '#473a3a', '#5a3526'])), side: THREE.DoubleSide });
-    ribbon(j => -wallL[j] - w(j), j => -wallL[j], j => G - TP[j].y - 0.3, 0, 10, bankMat);
-    ribbon(j => wallR[j], j => wallR[j] + w(j), 0, j => G - TP[j].y - 0.3, 10, bankMat);
   }
 
   // paint each jump ramp with yellow-and-black chevrons so it's seen coming
@@ -4663,40 +4292,7 @@ const DRUMS = {
 };
 
 const THEMES = [
-  { // Pepper Hill: bright, bouncy, sunny
-    bpm: 140, scale: 'major', leadBase: 72, bassBase: 48, chords: [0, 5, 3, 4, 3, 4, 0, 4],
-    lead: ['4.4.5.4.2...0...', '5.5.7.5.4...2...', '3.3.5.3.2.3.4...', '6-5-4-2-1...4...',
-      '7...7.6.5...3...', '6...6.5.4...1...', '4.5.7.9.7-..5.4.', '6.5.4.2.1-------'],
-    leadVoice: 'square', leadVol: 0.07, bass: 'R..R5..RR..R5.O.', bassVoice: 'triBass', bassVol: 0.16,
-    drums: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..x...x...x...x.', fill: '....x.......xxxx' },
-    amb: 'birds',
-  },
-  { // Cloud Nine Skyway: slow, floaty bells with echo over a soft pad
-    bpm: 100, scale: 'major', leadBase: 77, bassBase: 41, arpBase: 65, padBase: 53, chords: [0, 5, 1, 4, 0, 5, 3, 4],
-    lead: ['7...4...9...7...', '5.......4...2...', '3...5...8...7...', '6.......4.......',
-      '9...7...E...9...', '7.......5...4...', '3...4...5...7...', '4---------------'],
-    leadVoice: 'bell', leadVol: 0.08, bass: 'R.......5.......', bassVoice: 'sineBass', bassVol: 0.14,
-    arp: '0.2.4.7.4.2.0.2.', arpVoice: 'pluck', arpVol: 0.035, pad: true, padVol: 0.025,
-    drums: { kick: 'x.........x.....', shaker: '..x...x...x...x.' },
-    amb: 'wind',
-  },
-  { // Coral Causeway: calypso steel drums and marimba
-    bpm: 116, scale: 'major', leadBase: 67, bassBase: 43, chords: [0, 3, 4, 0, 0, 3, 1, 4],
-    lead: ['4..4..5.4..2..0.', '3..3..5.7..5..3.', '4..6..8.7..6..4.', '7..4..2.0.......',
-      '7.7.9.7..4..7...', '8.8.T.8..5..8...', '8..7..5.3..1..3.', '4..6..8.7-------'],
-    leadVoice: 'steel', leadVol: 0.1, bass: 'R..R..5.R..R..5.', bassVoice: 'marimba', bassVol: 0.2,
-    drums: { kick: 'x..x....x..x....', clap: '....x.......x...', shaker: 'xxxxxxxxxxxxxxxx', tom: '...h......m.l...' },
-    amb: 'sea',
-  },
-  { // Magma Mountain: dark phrygian riff, distorted and driving
-    bpm: 150, scale: 'phrygian', leadBase: 62, bassBase: 38, chords: [0, 1, 0, 1, 5, 4, 1, 0],
-    lead: ['0.0.3.0.4.3.1.0.', '1.1.4.1.5.4.3.1.', '0.0.3.0.4.3.1.0.', '1-------0-------',
-      '7.7.6.5.6.5.4.3.', '4.4.3.1.3.1.0.1.', '1.3.4.6.7.6.4.3.', '1-------0...0...'],
-    leadVoice: 'fuzz', leadVol: 0.05, bass: 'RR.RRR.RRR.RR.O.', bassVoice: 'fuzzBass', bassVol: 0.09,
-    drums: { kick: 'x.....x.x.....x.', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.x.', fill: '....x...x.xxxxxx' },
-    amb: 'lava',
-  },
-  { // 4 Danfo Dash: Afrobeats groove, highlife guitar over a rolling bass, bell and talking drum
+  { // 0 Danfo Dash: Afrobeats groove, highlife guitar over a rolling bass, bell and talking drum
     bpm: 112, scale: 'major', leadBase: 69, bassBase: 45, arpBase: 64, chords: [0, 3, 5, 4, 0, 3, 5, 4],
     lead: ['0.2.4..4.2.4.7..', '5.4.3..3.5.7.5..', '5.7.9..7.5.4.2..', '4.6.8..7.6.4----',
       '7.7.9.7..4..2.4.', '8.7.5.3..5..7...', '9.7.5.4.5.7.9.7.', '8.6.4.1.4-------'],
@@ -4705,7 +4301,7 @@ const THEMES = [
     drums: { kick: 'x..x....x..x..x.', clap: '....x.......x...', shaker: 'x.xxx.xxx.xxx.xx', bell: 'x.x.xx.x.x.xx.x.', tom: '..h..m....h.m.l.' },
     amb: 'city',
   },
-  { // 5 Garden City Grand Prix: breezy highlife, bright guitar over a walking bass
+  { // 1 Garden City Grand Prix: breezy highlife, bright guitar over a walking bass
     bpm: 124, scale: 'major', leadBase: 72, bassBase: 43, arpBase: 67, chords: [0, 4, 0, 3, 0, 4, 3, 4],
     lead: ['4.5.4.2.0...2.4.', '6.5.4.2.1...4...', '4.5.7.5.4.2.0...', '3.2.0.2.3.4.5...',
       '7...7.5.4.5.7...', '6.4.1.4.6...4...', '5.4.3.2.3.5.7.5.', '4.2.1.2.0-------'],
@@ -4714,7 +4310,7 @@ const THEMES = [
     drums: { kick: 'x.......x.x.....', clap: '....x.......x...', shaker: 'xxxxxxxxxxxxxxxx', bell: 'x..x..x...x..x..' },
     amb: 'waterfront',
   },
-  { // 6 Delta Creek Run: easy river groove, marimba over talking drum and bell
+  { // 2 Delta Creek Run: easy river groove, marimba over talking drum and bell
     bpm: 104, scale: 'major', leadBase: 69, bassBase: 45, arpBase: 64, chords: [0, 5, 3, 4, 0, 5, 3, 4],
     lead: ['2.4.5.4.2...0...', '4.5.7.5.4...2...', '0.2.4.2.0.2.4...', '1.2.4.1.4---....',
       '7.5.4.5.7...9...', '9.7.5.7.9...7...', '5.4.2.4.5.7.5.4.', '4.2.1.2.0-------'],
@@ -4723,7 +4319,7 @@ const THEMES = [
     drums: { kick: 'x.....x...x.....', shaker: 'x.xxx.xxx.xxx.xx', tom: 'h.m.l...h..m.l..', bell: 'x...x.x...x.x...' },
     amb: 'creek',
   },
-  { // 7 Zuma Rock Circuit: big, bright and driving, for the climb and the fast run down
+  { // 3 Zuma Rock Circuit: big, bright and driving, for the climb and the fast run down
     bpm: 136, scale: 'major', leadBase: 72, bassBase: 43, padBase: 55, chords: [0, 4, 5, 3, 0, 4, 3, 4],
     lead: ['0...4...7...4.5.', '4...6...8---7...', '5...7...9...7.5.', '3...5...7-6-5-4.',
       '7.7.9.7.4...2...', '6.6.8.6.4...1...', '5.4.3.5.7...9...', '8---7---6---4...'],
@@ -4731,7 +4327,7 @@ const THEMES = [
     drums: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'x.xxx.xxx.xxx.xx', tom: '............h.m.', fill: '....x.......xxxx' },
     amb: 'hills',
   },
-  { // 8 Bronze Kingdom: stately and proud, bronze bells over talking drums and a bell pattern
+  { // 4 Bronze Kingdom: stately and proud, bronze bells over talking drums and a bell pattern
     bpm: 118, scale: 'major', leadBase: 72, bassBase: 43, arpBase: 60, chords: [0, 3, 4, 0, 5, 3, 4, 4],
     lead: ['0...2.4.5...4...', '3...5.7.8...7...', '4...7.6.4...2...', '0.2.4.2.0-------',
       '7...9.7.5...4...', '5...7.5.3...2...', '4.5.7.5.4.2.1.2.', '4-------0-------'],
@@ -4740,7 +4336,7 @@ const THEMES = [
     drums: { kick: 'x.....x.x.......', tom: 'h..m..l.h.m.l...', bell: 'x.x.x..x.x.x..x.', shaker: '..x...x...x...x.' },
     amb: 'courtyard',
   },
-  { // 9 Plateau Peak Rally: brisk highland tune, plucked strings over a warm pad
+  { // 5 Plateau Peak Rally: brisk highland tune, plucked strings over a warm pad
     bpm: 128, scale: 'major', leadBase: 69, bassBase: 45, padBase: 57, arpBase: 64, chords: [0, 3, 4, 3, 0, 5, 3, 4],
     lead: ['4.2.0.2.4...4...', '5.4.3.4.5...5...', '6.5.4.5.6...4...', '2.3.4.2.0-------',
       '7...6.5.4...2...', '5...4.3.2...0...', '3.4.5.6.7.6.5.4.', '4---2---0-------'],
@@ -4749,7 +4345,7 @@ const THEMES = [
     drums: { kick: 'x...x...x...x...', clap: '....x.......x...', shaker: 'x.x.x.x.x.x.x.x.', fill: '....x.......xxxx', snare: '....x.......x...' },
     amb: 'hills',
   },
-  { // 10 Olumo Rock Rush: bouncing talking-drum groove with a bright plucked melody
+  { // 6 Olumo Rock Rush: bouncing talking-drum groove with a bright plucked melody
     bpm: 114, scale: 'major', leadBase: 71, bassBase: 43, arpBase: 62, chords: [0, 4, 5, 3, 0, 4, 3, 4],
     lead: ['4.4.2.0.2...4...', '5.5.4.2.4...5...', '7.5.4.2.4...2...', '0.2.4.5.4-------',
       '7.7.9.7.5...4...', '5.5.7.5.4...2...', '4.5.7.9.7.5.4.2.', '1.2.4.2.0-------'],
@@ -4758,7 +4354,7 @@ const THEMES = [
     drums: { kick: 'x..x....x..x....', tom: 'h.hm.l..h.hm.l.m', bell: 'x.x.xx.x.x.xx.x.', shaker: 'x.xxx.xxx.xxx.xx', clap: '....x.......x...' },
     amb: 'courtyard',
   },
-  { // 11 Sacred Grove Sprint: hushed and green, bell melody over a soft pad and gentle drums
+  { // 7 Sacred Grove Sprint: hushed and green, bell melody over a soft pad and gentle drums
     bpm: 98, scale: 'major', leadBase: 74, bassBase: 43, padBase: 55, arpBase: 67, chords: [0, 5, 3, 4, 0, 5, 1, 4],
     lead: ['4...7...6.4.2...', '5...9...7.5.4...', '3...5...4.2.0...', '1...2...4-------',
       '7...9...E.9.7...', '9...7...5.4.2...', '3.4.5.7.9.7.5.4.', '4---------------'],
@@ -4767,7 +4363,7 @@ const THEMES = [
     drums: { kick: 'x.......x.......', tom: '..h...m...h.l...', shaker: '..x...x...x...x.' },
     amb: 'forest',
   },
-  { // 12 Carnival Chaos: full-on carnival, steel pans and brass-bright lead over a samba-style beat
+  { // 8 Carnival Chaos: full-on carnival, steel pans and brass-bright lead over a samba-style beat
     bpm: 138, scale: 'major', leadBase: 72, bassBase: 43, arpBase: 67, chords: [0, 4, 0, 3, 0, 4, 3, 4],
     lead: ['4.4.4.5.7...4...', '5.5.5.7.9...7...', '4.7.9.7.4.2.0...', '1.2.4.2.1-------',
       '7.9.7.9.T.9.7...', '8.7.5.4.5...4...', '7.7.9.7.5.4.2.4.', '4-------0---4...'],
@@ -4776,7 +4372,7 @@ const THEMES = [
     drums: { kick: 'x..x..x.x..x..x.', clap: '....x.......x...', shaker: 'xxxxxxxxxxxxxxxx', tom: '..h.m.l...h.m...', bell: 'x.x.xx.x.x.xx.x.', fill: '....x...x.xxxxxx', snare: '....x.......x...' },
     amb: 'crowd',
   },
-  { // 13 Savannah Stampede: open and rolling, marimba and kalimba-like plucks over hand drums
+  { // 9 Savannah Stampede: open and rolling, marimba and kalimba-like plucks over hand drums
     bpm: 120, scale: 'major', leadBase: 69, bassBase: 45, arpBase: 69, padBase: 57, chords: [0, 4, 5, 3, 0, 4, 3, 0],
     lead: ['0.2.4...4.5.4.2.', '4.5.7...7.9.7.5.', '9.7.5...4.2.4...', '5.4.2.0.2-------',
       '7...9.7.5...4...', '4...5.4.2...0...', '2.4.5.7.9.7.5.4.', '2-------0-------'],
@@ -4785,7 +4381,7 @@ const THEMES = [
     drums: { kick: 'x.....x...x.....', tom: 'h..m..l.h..m.l..', shaker: 'x.xxx.xxx.xxx.xx', bell: '..x...x...x...x.' },
     amb: 'savannah',
   },
-  { // 14 Atlantic Coast Chase: sunny seaside highlife, steel-pan melody over a lilting beat
+  { // 10 Atlantic Coast Chase: sunny seaside highlife, steel-pan melody over a lilting beat
     bpm: 116, scale: 'major', leadBase: 72, bassBase: 43, arpBase: 64, chords: [0, 3, 4, 0, 5, 3, 4, 4],
     lead: ['4..4..5.7..5..4.', '5..5..7.9..7..5.', '4..2..0.2..4..5.', '4..2..1.2-------',
       '7.7.9.7..4..7...', '8.8.9.8..5..8...', '7..5..4.5..7..9.', '7-------4-------'],
@@ -4794,7 +4390,7 @@ const THEMES = [
     drums: { kick: 'x..x....x..x....', clap: '....x.......x...', shaker: 'xxxxxxxxxxxxxxxx', tom: '...h......m.l...' },
     amb: 'sea',
   },
-  { // 15 Palm Forest Rally: warm and earthy, plucked guitar over talking drums and a busy shaker
+  { // 11 Palm Forest Rally: warm and earthy, plucked guitar over talking drums and a busy shaker
     bpm: 108, scale: 'major', leadBase: 69, bassBase: 43, arpBase: 64, chords: [0, 5, 3, 4, 0, 5, 4, 0],
     lead: ['0.2.4.5.4.2.0...', '2.4.5.7.5.4.2...', '4.5.7.9.7.5.4...', '5.4.2.1.2-------',
       '7.7.5.4.5...4...', '4.4.2.0.2...0...', '2.4.5.7.9.7.5.4.', '2-------0-------'],
@@ -4802,6 +4398,15 @@ const THEMES = [
     arp: '0.4.2.4.0.4.2.4.', arpVoice: 'marimba', arpVol: 0.05,
     drums: { kick: 'x..x....x..x....', tom: 'h.m.l.h...m.l...', shaker: 'xxxxxxxxxxxxxxxx', clap: '....x.......x...' },
     amb: 'forest',
+  },
+  { // 12 Mangrove Mayhem: misty and twisting, marimba and bell over a slow, rolling drum
+    bpm: 106, scale: 'major', leadBase: 69, bassBase: 41, padBase: 53, arpBase: 65, chords: [5, 3, 0, 4, 5, 3, 1, 4],
+    lead: ['5.4.2.4.5...7...', '3.2.0.2.3...5...', '4.5.7.5.4.2.0...', '1.2.4.2.1-------',
+      '7.5.4.5.7...9...', '5.4.2.4.5...4...', '2.4.5.7.5.4.2.1.', '2---------------'],
+    leadVoice: 'marimba', leadVol: 0.15, bass: 'R...R.5.R...R.O.', bassVoice: 'sineBass', bassVol: 0.16, pad: true, padVol: 0.024,
+    arp: '0...4...2...4...', arpVoice: 'bell', arpVol: 0.025,
+    drums: { kick: 'x.....x...x.....', tom: 'h..m..l...h.m...', shaker: '..x...x...x...x.' },
+    amb: 'creek',
   },
 ];
 
@@ -4846,22 +4451,7 @@ function startAmbience(kind) {
     o.start(t); o.stop(t + dur + 0.05);
   };
   let tick = () => {};
-  if (kind === 'birds') {
-    const f = filt('bandpass', 700, 0.5), g = gain(0.022);
-    loop(noiseBuf).connect(f); f.connect(g); g.connect(ambBus);
-    lfo(0.09, 0.012, g.gain);
-    tick = t => {
-      if (Math.random() < 0.014) {
-        const base = rand(2600, 4200), n = 2 + (Math.random() * 3 | 0);
-        for (let k = 0; k < n; k++) blip(t + k * 0.11, 'sine', base, base * rand(1.2, 1.5), 0.08, 0.035);
-      }
-    };
-  } else if (kind === 'wind') {
-    const f = filt('bandpass', 500, 0.8), g = gain(0.07);
-    loop(noiseBuf).connect(f); f.connect(g); g.connect(ambBus);
-    lfo(0.07, 320, f.frequency); lfo(0.11, 0.035, g.gain);
-    tick = t => { if (Math.random() < 0.006) { const fr = rand(1800, 3200); blip(t, 'sine', fr, fr * 0.998, 2.2, 0.012); } };
-  } else if (kind === 'sea') {
+  if (kind === 'sea') {
     const f = filt('lowpass', 520), g = gain(0.075);
     loop(noiseBuf).connect(f); f.connect(g); g.connect(ambBus);
     lfo(0.12, 0.06, g.gain);
@@ -4873,14 +4463,6 @@ function startAmbience(kind) {
         const n = 2 + (Math.random() * 2 | 0), base = rand(1300, 1700);
         for (let k = 0; k < n; k++) blip(t + k * 0.32, 'triangle', base, base * 0.62, 0.28, 0.022, 9);
       }
-    };
-  } else if (kind === 'lava') {
-    const f = filt('lowpass', 150), g = gain(0.22);
-    loop(brownBuf).connect(f); f.connect(g); g.connect(ambBus);
-    lfo(0.3, 0.07, g.gain);
-    tick = t => {
-      if (Math.random() < 0.08) noiseHit(t, 'highpass', 3000, rand(0.015, 0.045), 0.02, ambBus);
-      if (Math.random() < 0.004) noiseHit(t, 'lowpass', 90, 0.45, 1.8, ambBus, brownBuf);
     };
   } else if (kind === 'savannah') {
     // a warm wind across the plain, cicadas, birds, and an elephant trumpeting far off
@@ -5975,10 +5557,6 @@ function drawMinimapBase() {
   for (const B of BRANCHES) { branch(B); g.strokeStyle = '#8a7a66'; g.lineWidth = 6; g.stroke(); }
   path(); g.strokeStyle = '#51555f'; g.lineWidth = 13; g.stroke();
   if (tunnel) { path(tunnel.i0, tunnel.i1); g.strokeStyle = '#1B1330'; g.lineWidth = 13; g.stroke(); }
-  if (L.volcano) {
-    const [vx, vy] = mmMap(L.volcano[0] * L.scale, L.volcano[1] * L.scale);
-    g.fillStyle = '#FF5A1F'; g.beginPath(); g.moveTo(vx, vy - 18); g.lineTo(vx + 18, vy + 12); g.lineTo(vx - 18, vy + 12); g.closePath(); g.fill();
-  }
   const [sx, sy] = mmMap(TP[0].x, TP[0].z);
   const s = TS[0];
   g.strokeStyle = '#FFD23F'; g.lineWidth = 5;
@@ -6163,7 +5741,7 @@ function startRace() {
   $('#hud').hidden = false;
   $('#touch').hidden = !isTouch;
   $('#center').textContent = '';
-  toast(`Track ${levelIdx + 1}: ${L.name}`, 'good', 2200);
+  toast(`${raceLabel(levelIdx)}: ${L.name}`, 'good', 2200);
   camera.fov = 68; camera.updateProjectionMatrix();
   updateRanks();
 }
@@ -6190,19 +5768,22 @@ function showResults() {
   $('#results').hidden = false;
   $('#touch').hidden = true;
   const place = player.place;
-  $('#resTitle').textContent = place === 1 ? 'You won the cup!' : `You finished ${place}${ORD[place - 1]}`;
-  $('#resSub').textContent = `Track ${levelIdx + 1} · ${L.name} · ${cls}`;
+  $('#resTitle').textContent = place === 1 ? 'You won!' : `You finished ${place}${ORD[place - 1]}`;
+  $('#resSub').textContent = `${raceLabel(levelIdx)} · ${L.name} · ${cls}`;
   $('#resBest').innerHTML = `Race time <b>${fmt(player.time)}</b> &middot; Best lap <b>${fmt(bestLap)}</b>`;
   const last = levelIdx === LEVELS.length - 1;
   const nextOpen = last || levelIdx + 1 <= unlocked;
   $('#nextBtn').hidden = !nextOpen || !!net;
-  $('#nextBtn').textContent = last ? 'Back to track 1' : `Next: ${LEVELS[levelIdx + 1].name}`;
+  $('#nextBtn').textContent = last ? `Back to ${LEVELS[0].name}` : `Next: ${LEVELS[levelIdx + 1].name}`;
   if (justUnlocked >= 0) {
-    $('#resBest').insertAdjacentHTML('beforeend', `<br><span class="unlock">New track unlocked: ${LEVELS[justUnlocked].name}!</span>`);
+    const newCup = CUPS.find(c => c.tracks[0] === justUnlocked); // the first track of a cup opens the whole cup
+    $('#resBest').insertAdjacentHTML('beforeend', newCup
+      ? `<br><span class="unlock">${CUPS[cupOf(levelIdx)].name} complete! ${newCup.name} unlocked: ${LEVELS[justUnlocked].name}</span>`
+      : `<br><span class="unlock">New track unlocked: ${LEVELS[justUnlocked].name}!</span>`);
   } else if (!nextOpen) {
     $('#resBest').insertAdjacentHTML('beforeend', `<br>Finish in the top 3 to unlock <b>${LEVELS[levelIdx + 1].name}</b>.`);
   } else if (last && place <= 3) {
-    $('#resBest').insertAdjacentHTML('beforeend', `<br><span class="unlock">You've conquered every track!</span>`);
+    $('#resBest').insertAdjacentHTML('beforeend', `<br><span class="unlock">All four cups conquered!</span>`);
   }
   renderResults();
   (net ? $('#menuBtn') : nextOpen ? $('#nextBtn') : $('#againBtn')).focus({ preventScroll: true });
@@ -6245,6 +5826,7 @@ function saveUnlocked() { try { localStorage.setItem(UNLOCK_KEY, String(unlocked
 
 function selectLevel(i) {
   if (i > unlocked) return;
+  menuCup = cupOf(i);
   const changed = i !== levelIdx || !levelGroup;
   if (changed) buildLevel(i);
   buildGrid();
@@ -6383,24 +5965,45 @@ ROSTER.forEach((d, i) => {
 });
 $('#trackCount').textContent = LEVELS.length;
 const tracksEl = $('#tracks');
-LEVELS.forEach((lv, i) => {
-  const b = document.createElement('button');
-  b.className = 'trk'; b.id = 'trk' + i;
-  b.innerHTML = `<span class="band" style="background:${lv.band}"></span><span class="tn">Track ${i + 1}</span><b>${lv.name}</b><small></small>`;
-  b.addEventListener('click', () => selectLevel(i));
-  tracksEl.appendChild(b);
-});
+// cup tabs and track cards: one set on the title screen, one in the online lobby
+function buildTrackPicker(tabsEl, cardsEl, onTab, onPick) {
+  CUPS.forEach((c, n) => {
+    const b = document.createElement('button');
+    b.setAttribute('role', 'tab');
+    b.innerHTML = `${c.short}<span class="lk"></span>`;
+    b.addEventListener('click', () => onTab(n));
+    tabsEl.appendChild(b);
+  });
+  LEVELS.forEach((lv, i) => {
+    const b = document.createElement('button');
+    b.className = 'trk';
+    b.innerHTML = `<span class="band" style="background:${lv.band}"></span><span class="tn">${raceLabel(i)}</span><b>${lv.name}</b><small></small>`;
+    b.addEventListener('click', () => onPick(i));
+    cardsEl.appendChild(b);
+  });
+}
+// show cup n's tracks; current: the selected track; lockedText(i): what a locked card says
+function syncTrackPicker(tabsEl, cardsEl, n, current, lockedText) {
+  tabsEl.querySelectorAll('button').forEach((b, k) => {
+    b.setAttribute('aria-selected', String(k === n));
+    b.querySelector('.lk').textContent = CUPS[k].tracks[0] > unlocked ? 'LOCKED' : '';
+  });
+  cardsEl.querySelectorAll('.trk').forEach((b, i) => {
+    const locked = i > unlocked;
+    b.hidden = cupOf(i) !== n;
+    b.setAttribute('aria-pressed', String(i === current));
+    b.disabled = locked;
+    b.querySelector('small').textContent = locked ? lockedText(i) : LEVELS[i].tag;
+    b.querySelector('.band').innerHTML = locked ? '<span class="lock">LOCKED</span>' : '';
+  });
+}
+let menuCup = 0;
+buildTrackPicker($('#cupTabs'), tracksEl, n => { menuCup = n; syncMenu(); }, i => selectLevel(i));
 document.querySelectorAll('#classSeg button').forEach(b => b.addEventListener('click', () => { cls = b.dataset.c; syncMenu(); }));
 function syncMenu() {
   chips.querySelectorAll('.chip').forEach((b, i) => b.setAttribute('aria-pressed', String(i === playerDef)));
-  tracksEl.querySelectorAll('.trk').forEach((b, i) => {
-    const locked = i > unlocked;
-    b.setAttribute('aria-pressed', String(i === levelIdx));
-    b.disabled = locked;
-    b.querySelector('small').textContent = locked ? `Top 3 on ${LEVELS[i - 1].name} to unlock` : LEVELS[i].tag;
-    const band = b.querySelector('.band');
-    band.innerHTML = locked ? '<span class="lock">LOCKED</span>' : '';
-  });
+  syncTrackPicker($('#cupTabs'), tracksEl, menuCup, levelIdx, i => `Top 3 on ${LEVELS[i - 1].name} to unlock`);
+  $('#cupTag').textContent = CUPS[menuCup].tag;
   document.querySelectorAll('#classSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === cls)));
   $('#resetBtn').disabled = unlocked === 0;
 }
@@ -6906,6 +6509,7 @@ function showLobby() {
   for (const id of ['#title', '#online', '#results', '#pause', '#hud', '#touch']) $(id).hidden = true;
   netMenu = false;
   $('#lobby').hidden = false;
+  lobbyCup = cupOf(net ? net.level : levelIdx);
   renderLobby();
   if (!isTouch) $(net && net.host ? '#lobbyStart' : '#leaveBtn').focus({ preventScroll: true });
 }
@@ -6944,16 +6548,10 @@ function renderLobby() {
   $('#guestOpts').hidden = net.host;
   $('#lobbyStart').hidden = !net.host;
   if (net.host) {
-    $('#lobbyTracks').querySelectorAll('.trk').forEach((b, i) => {
-      const locked = i > unlocked;
-      b.setAttribute('aria-pressed', String(i === net.level));
-      b.disabled = locked;
-      b.querySelector('small').textContent = locked ? 'Locked' : LEVELS[i].tag;
-      b.querySelector('.band').innerHTML = locked ? '<span class="lock">LOCKED</span>' : '';
-    });
+    syncTrackPicker($('#lobbyCupTabs'), $('#lobbyTracks'), lobbyCup, net.level, () => 'Locked');
     $('#lobbyClass').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === net.cls)));
   } else {
-    $('#lobbyRace').textContent = `${LEVELS[net.level].name} · ${net.cls}`;
+    $('#lobbyRace').textContent = `${CUPS[cupOf(net.level)].name} · ${LEVELS[net.level].name} · ${net.cls}`;
     $('#lobbyWait').textContent = !me ? 'Joining…'
       : net.racing && state === 'title' ? "A race is under way. You'll be on the grid for the next one."
       : 'Waiting for the host to start the race.';
@@ -6970,13 +6568,9 @@ ROSTER.forEach((d, i) => {
   });
   $('#lobbyChips').appendChild(b);
 });
-LEVELS.forEach((lv, i) => {
-  const b = document.createElement('button');
-  b.className = 'trk';
-  b.innerHTML = `<span class="band" style="background:${lv.band}"></span><span class="tn">Track ${i + 1}</span><b>${lv.name}</b><small></small>`;
-  b.addEventListener('click', () => { if (net && net.host && i <= unlocked) { net.level = i; broadcastLobby(); } });
-  $('#lobbyTracks').appendChild(b);
-});
+let lobbyCup = 0;
+buildTrackPicker($('#lobbyCupTabs'), $('#lobbyTracks'), n => { lobbyCup = n; if (net) renderLobby(); },
+  i => { if (net && net.host && i <= unlocked) { net.level = i; lobbyCup = cupOf(i); broadcastLobby(); } });
 $('#lobbyClass').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
   if (net && net.host) { net.cls = b.dataset.c; broadcastLobby(); }
 }));

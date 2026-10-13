@@ -2,38 +2,62 @@
 
 A 3D kart racer that runs in the browser. Race five computer rivals over three laps, or up to five friends online. Drift for mini-turbos, grab items and unlock every track.
 
-![Title screen](screenshots/01-title.png)
+![Title screen](screenshots/01-title.jpg)
 
-| Pepper Hill | Cloud Nine Skyway |
+| Danfo Dash | Bronze Kingdom |
 |---|---|
-| ![Pepper Hill](screenshots/02-pepper-hill.png) | ![Cloud Nine Skyway](screenshots/03-cloud-nine-skyway.png) |
-| **Coral Causeway** | **Magma Mountain** |
-| ![Coral Causeway](screenshots/04-coral-causeway.png) | ![Magma Mountain volcano](screenshots/05-magma-mountain-volcano.png) |
+| ![Danfo Dash](screenshots/02-danfo-dash.jpg) | ![Bronze Kingdom](screenshots/03-bronze-kingdom.jpg) |
+| **Savannah Stampede** | **Carnival Chaos** |
+| ![Savannah Stampede](screenshots/04-savannah-stampede.jpg) | ![Carnival Chaos](screenshots/05-carnival-chaos.jpg) |
 
-![The tunnel through Magma Mountain](screenshots/06-magma-mountain-tunnel.png)
+![Mangrove Mayhem](screenshots/06-mangrove-mayhem.jpg)
 
 ## Tracks
+
+13 tracks in four cups. Pick a cup on the title screen, then a track.
+
+### Naija Street Cup
+
+*Accessible, traffic-focused racing.*
 
 | # | Track | Setting |
 |---|-------|---------|
 | 1 | Danfo Dash | Lagos streets, markets and a flyover over the lagoon. Yellow danfo buses drive laps in the outer lanes and spin you out if you hit them; parked cars, potholes and roadworks narrow the road. A service lane behind the market stalls is a shortcut, but it's narrow and has parked cars in it |
 | 2 | Garden City Grand Prix | Port Harcourt: a tree-lined boulevard, a narrow bridge over a creek, then an industrial waterfront and a riverside run to the finish. The waterfront roads are wet and slippery (karts slide wide), puddles splash you, steam drifts across the road and slow tanker trucks do laps. A riverside service road is a shortcut, but it's narrow and wet all the way |
 | 3 | Delta Creek Run | Warri: a riverside settlement, a raised causeway and a long bridge over the creek, tight bends through a riverside neighbourhood (with mud that bogs you down), then a bumpy plank jetty to the finish. Boats run up and down the channels and debris drifts on the water. A narrow plank boardwalk is a shortcut, with a jump over a broken section: hit the ramp fast or you drop into the water and start again on the boardwalk |
+
+### Legends of the Land Cup
+
+*Landmarks and technical turns.*
+
+| # | Track | Setting |
+|---|-------|---------|
 | 4 | Zuma Rock Circuit | Abuja: a modern boulevard out of the city, then a climb past Zuma Rock through two tight hairpins, a tunnel through a rock outcrop and a fast run back down. Climbs slow you and descents let you run past your top speed. Rocks fall in two marked stretches (a red ring shows where), and loose gravel cuts your grip. A narrow, rough mountain pass cuts across the second hairpin |
 | 5 | Bronze Kingdom | Benin City: a monumental gate, a ceremonial avenue of bronze sculptures, a courtyard district of tight corners between patterned walls, three timed gateways, and a plaza of turning bronze arms and sliding floor plates. Each gateway has two leaves that rise from the road in turn, so one half is always open: lamps go green, then flash amber before a leaf rises, then red. A narrow passage between courtyards cuts the last corner, with a tight exit just before the first gateway |
-| 6 | Plateau Peak Rally | Jos: a highland road that sweeps down into a rocky valley, then climbs three hairpins back to the plateau. Boulders roll across the road at marked crossings on a fixed cycle (lamps flash and a red line pulses first), gravel lines the outside of bends, and two chevron-marked ramps launch you: land pointing down the road or lose speed. A rough hillside cut skips the two sweeping bends and ends in a jump back onto the road |
-| 7 | Olumo Rock Rush | Abeokuta: from a town square, up round a great granite formation, through a natural rock arch and down three switchbacks hemmed in by boulders, then a stone-lined run home. The road edges are raised stone: clip them and you lose speed. Small stones fall in two marked stretches and gravel lines the outside of two hairpins. A lit cave through the rock formation cuts off the big climbing curve |
-| 8 | Sacred Grove Sprint | Osogbo: through a forest entrance, under a dense leafy canopy (falling leaves, shafts of light, a closer green haze), over a river bridge and into an open clearing lined with abstract sculptures, then back through the forest. Roots across the road edges jolt you and low branches overhang them. On the bridge, two wooden drawbridge halves (marked by jade lanterns) take turns to tip up, so one half is always open. A narrow woodland path twists through the clearing as a shortcut. The sculptures are fictional forms, set back from the road |
-| 9 | Carnival Chaos | Calabar at festival time: under a rainbow festival arch, down a parade avenue between cheering crowds and bunting, sweeping bends round stages and giant drums, a decorated plaza with a chicane, and an illuminated boulevard under arches of colour-chasing lights. Festival boost zones are painted across the road: cross inside the glowing band (marked with floating music notes) for a boost. Slow parade floats do laps, foam inflatables bounce you off the edges, festival barriers make alternate lines, and confetti cannons fill the edges of your view. A backstage service lane with a narrow entrance skips the plaza |
-| 10 | Savannah Stampede | Yankari: a broad dusty road onto the open savannah, gentle bends through rocky country, a bridge over a stream, and a fast dirt road home. The hardpack grips; the dirt stretches slide and throw up dust, so corners need a different touch. Elephants and giraffes cross at two signposted spots on a fixed cycle (lamps flash first; bumping one only slows you), rocks line the edges in the rocky section, and there's mud by the stream. A bumpy, loose trail across the scrub is a shortcut |
-| 11 | Atlantic Coast Chase | Badagry: a paved coastal road curving beside the lagoon, a narrow wooden bridge over a creek, a sandy beachside stretch round a headland, and a fast paved run home. Paving grips; sand slides and slows you. Shallow water crosses the road at two marked spots (just a splash), and fishing nets, baskets and crates line the beach. A sandy route across the dunes cuts off the headland |
-| 12 | Palm Forest Rally | A tropical plantation: a broad access road, then red-earth tracks between long rows of palms, a narrow S-bend section, a muddy clearing with a small jump, and a straight home through the plantation. The tree-lined corridors are narrow, so clean driving beats raw speed. Logs and fallen fronds lie at some edges, small branches lie on the road, and the mud is slippery. A narrow maintenance lane through denser palms skips the S-bends |
-| 13 | Pepper Hill | Rolling green hills |
-| 14 | Cloud Nine Skyway | A floating road above the clouds |
-| 15 | Coral Causeway | A bridge over the sea |
-| 16 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
+| 6 | Olumo Rock Rush | Abeokuta: from a town square, up round a great granite formation, through a natural rock arch and down three switchbacks hemmed in by boulders, then a stone-lined run home. The road edges are raised stone: clip them and you lose speed. Small stones fall in two marked stretches and gravel lines the outside of two hairpins. A lit cave through the rock formation cuts off the big climbing curve |
 
-Finish a track in the top 3 to unlock the next one. Progress is saved in your browser, and **Reset progress** on the title screen locks the tracks again.
+### Nature's Challenge Cup
+
+*Elevation, grip changes and off-road racing.*
+
+| # | Track | Setting |
+|---|-------|---------|
+| 7 | Plateau Peak Rally | Jos: a highland road that sweeps down into a rocky valley, then climbs three hairpins back to the plateau. Boulders roll across the road at marked crossings on a fixed cycle (lamps flash and a red line pulses first), gravel lines the outside of bends, and two chevron-marked ramps launch you: land pointing down the road or lose speed. A rough hillside cut skips the two sweeping bends and ends in a jump back onto the road |
+| 8 | Savannah Stampede | Yankari: a broad dusty road onto the open savannah, gentle bends through rocky country, a bridge over a stream, and a fast dirt road home. The hardpack grips; the dirt stretches slide and throw up dust, so corners need a different touch. Elephants and giraffes cross at two signposted spots on a fixed cycle (lamps flash first; bumping one only slows you), rocks line the edges in the rocky section, and there's mud by the stream. A bumpy, loose trail across the scrub is a shortcut |
+| 9 | Atlantic Coast Chase | Badagry: a paved coastal road curving beside the lagoon, a narrow wooden bridge over a creek, a sandy beachside stretch round a headland, and a fast paved run home. Paving grips; sand slides and slows you. Shallow water crosses the road at two marked spots (just a splash), and fishing nets, baskets and crates line the beach. A sandy route across the dunes cuts off the headland |
+
+### Culture & Wildways Cup
+
+*Environmental variety and advanced shortcuts.*
+
+| # | Track | Setting |
+|---|-------|---------|
+| 10 | Sacred Grove Sprint | Osogbo: through a forest entrance, under a dense leafy canopy (falling leaves, shafts of light, a closer green haze), over a river bridge and into an open clearing lined with abstract sculptures, then back through the forest. Roots across the road edges jolt you and low branches overhang them. On the bridge, two wooden drawbridge halves (marked by jade lanterns) take turns to tip up, so one half is always open. A narrow woodland path twists through the clearing as a shortcut. The sculptures are fictional forms, set back from the road |
+| 11 | Carnival Chaos | Calabar at festival time: under a rainbow festival arch, down a parade avenue between cheering crowds and bunting, sweeping bends round stages and giant drums, a decorated plaza with a chicane, and an illuminated boulevard under arches of colour-chasing lights. Festival boost zones are painted across the road: cross inside the glowing band (marked with floating music notes) for a boost. Slow parade floats do laps, foam inflatables bounce you off the edges, festival barriers make alternate lines, and confetti cannons fill the edges of your view. A backstage service lane with a narrow entrance skips the plaza |
+| 12 | Palm Forest Rally | A tropical plantation: a broad access road, then red-earth tracks between long rows of palms, a narrow S-bend section, a muddy clearing with a small jump, and a straight home through the plantation. The tree-lined corridors are narrow, so clean driving beats raw speed. Logs and fallen fronds lie at some edges, small branches lie on the road, and the mud is slippery. A narrow maintenance lane through denser palms skips the S-bends |
+| 13 | Mangrove Mayhem | The Niger Delta wetlands: a raised road over the water, down into a winding mangrove corridor, two narrow timber bridges either side of a tight bend, a run of slippery linked curves, and back up onto the raised road. Mud patches and slick bends cut your grip, and mangrove roots creep onto the outside of the turns, so line choice matters. Debris and canoes drift on the water. A short plank boardwalk across the shallows cuts the corridor's big bend |
+
+Finish a track in the top 3 to unlock the next one. A top-3 finish on the last track of a cup opens the next cup. Progress is saved in your browser, and **Reset progress** on the title screen locks the tracks again.
 
 Each track has its own music and background sounds, generated live with the Web Audio API.
 
@@ -55,8 +79,6 @@ Each track has its own music and background sounds, generated live with the Web 
 
 Hold your phone sideways. The kart accelerates by itself, ◀ ▶ steer on the left, and **Drift**, **Item** and **Brake** sit on the right, with a pause button at the top. On Android, tapping **Start race** switches to full screen and locks the phone to landscape. On iPhone, turn it sideways yourself (the game asks you to when it's held upright).
 
-![Racing on a phone in landscape](screenshots/07-phone-landscape.png)
-
 ## Play online with friends
 
 1. On the title screen choose **Play online with friends**, type your name and choose **Host a race**.
@@ -70,7 +92,7 @@ Up to 6 people can race, and computer rivals fill the empty places. The host can
 
 Players connect to each other directly in the browser (WebRTC), through [PeerJS](https://peerjs.com/). PeerJS's free public server only introduces the players to each other. If two networks can't connect directly (phone data, school or work Wi-Fi, some routers), a relay from [Metered](https://www.metered.ca/stun-turn) carries the traffic instead. The relay's passwords come from a small [Cloudflare Worker](worker/turn-credentials.js) (`TURN_CREDENTIALS_URL` in `index.html`), so the Metered key never appears in the game's code. The key is stored as the Worker's `METERED_API_KEY` secret, and the Worker only answers requests from the game's website. Apart from that Worker, there is no server to run, so online play works on GitHub Pages as it is.
 
-Every player's computer drives their own kart, so steering never waits on the internet. Each kart's position goes out 20 times a second, and other people's karts glide between updates. The host's computer also drives the computer rivals and the volcano. Shells and bananas are announced when they're thrown, and the computer of the kart that gets hit decides the hit.
+Every player's computer drives their own kart, so steering never waits on the internet. Each kart's position goes out 20 times a second, and other people's karts glide between updates. The host's computer also drives the computer rivals and the moving hazards. Shells and bananas are announced when they're thrown, and the computer of the kart that gets hit decides the hit.
 
 All messages pass through the host. The connection code (`peerTransport()` in `index.html`) is kept separate from the game, so it can be swapped for a WebSocket game server later without changing the race code.
 
