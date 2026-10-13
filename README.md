@@ -19,10 +19,11 @@ A 3D kart racer that runs in the browser. Race five computer rivals over three l
 | 1 | Danfo Dash | Lagos streets, markets and a flyover over the lagoon. Yellow danfo buses drive laps in the outer lanes and spin you out if you hit them; parked cars, potholes and roadworks narrow the road. A service lane behind the market stalls is a shortcut, but it's narrow and has parked cars in it |
 | 2 | Garden City Grand Prix | Port Harcourt: a tree-lined boulevard, a narrow bridge over a creek, then an industrial waterfront and a riverside run to the finish. The waterfront roads are wet and slippery (karts slide wide), puddles splash you, steam drifts across the road and slow tanker trucks do laps. A riverside service road is a shortcut, but it's narrow and wet all the way |
 | 3 | Delta Creek Run | Warri: a riverside settlement, a raised causeway and a long bridge over the creek, tight bends through a riverside neighbourhood (with mud that bogs you down), then a bumpy plank jetty to the finish. Boats run up and down the channels and debris drifts on the water. A narrow plank boardwalk is a shortcut, with a jump over a broken section: hit the ramp fast or you drop into the water and start again on the boardwalk |
-| 4 | Pepper Hill | Rolling green hills |
-| 5 | Cloud Nine Skyway | A floating road above the clouds |
-| 6 | Coral Causeway | A bridge over the sea |
-| 7 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
+| 4 | Zuma Rock Circuit | Abuja: a modern boulevard out of the city, then a climb past Zuma Rock through two tight hairpins, a tunnel through a rock outcrop and a fast run back down. Climbs slow you and descents let you run past your top speed. Rocks fall in two marked stretches (a red ring shows where), and loose gravel cuts your grip. A narrow, rough mountain pass cuts across the second hairpin |
+| 5 | Pepper Hill | Rolling green hills |
+| 6 | Cloud Nine Skyway | A floating road above the clouds |
+| 7 | Coral Causeway | A bridge over the sea |
+| 8 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
 
 Finish a track in the top 3 to unlock the next one. Progress is saved in your browser, and **Reset progress** on the title screen locks the tracks again.
 

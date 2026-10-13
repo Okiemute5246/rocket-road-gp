@@ -930,6 +930,7 @@ let MAIN = null, BRANCHES = [], PATHS = [];
 let OBST = [];
 let WET = new Uint8Array(N); // 1 where the main road is wet and slippery
 let PLANK = new Uint8Array(N); // 1 where the main road is bumpy wooden planks
+let GRAVEL = new Uint8Array(N); // 1 where the main road is loose gravel: less grip, a little slower
 const pathHeading = (P, i) => Math.atan2(P.T[i].x, P.T[i].z);
 // where a racer on a branch counts as being on the main loop, for laps and places
 function progIdx(o) {
@@ -1601,6 +1602,45 @@ function mergeStatic(root, moving) {
     for (const o of list) o.parent.remove(o); // (their geometry was never drawn, and may be shared)
     root.add(new THREE.Mesh(geo, mat));
   }
+}
+
+// Ground shaped to meet the roads, so a road is always on the ground or held up by it: next to a road
+// the ground sits just under the tarmac, and further out it eases into the landscape's own height
+// natural(x, z). Coloured per vertex: grass, red earth where it's been cut or banked up, granite up high.
+// Returns heightAt(x, z) for placing things on it.
+function addTerrain(E, natural, o = {}) {
+  const { size = 1700, segs = 170, grass = [0x5fae45, 0x4f9a3c, 0x6cba50], earth = 0xa65a3c, rock = 0x8d8a86, rockAbove = 75 } = o;
+  const geo = new THREE.PlaneGeometry(size, size, segs, segs).rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position, cols = new Float32Array(pos.count * 3), col = new THREE.Color();
+  const samples = [];
+  for (const P of PATHS) for (let i = 0; i < P.n; i += 2) samples.push(P.P[i].x, P.P[i].z, P.P[i].y, Math.max(P.wL[i], P.wR[i]));
+  const heights = new Float32Array(pos.count);
+  for (let v = 0; v < pos.count; v++) {
+    const x = pos.getX(v) + E.cx, z = pos.getZ(v) + E.cz;
+    let bd = Infinity, by = 0, bw = WALL;
+    for (let s = 0; s < samples.length; s += 4) {
+      const dx = x - samples[s], dz = z - samples[s + 1], d = dx * dx + dz * dz;
+      if (d < bd) { bd = d; by = samples[s + 2]; bw = samples[s + 3]; }
+    }
+    const nat = natural(x, z), t = clamp((Math.sqrt(bd) - bw - 6) / 50, 0, 1), e = t * t * (3 - 2 * t);
+    const h = lerp(by - 0.5, nat, e);
+    pos.setY(v, h); heights[v] = h;
+    if (h > rockAbove) col.setHex(rock);
+    else if (Math.abs(nat - h) > 4 && e < 0.9) col.setHex(earth);
+    else col.setHex(grass[(hash(x * 0.13 + z * 0.71) * grass.length) | 0]);
+    col.toArray(cols, v * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, lambert({ vertexColors: true, flatShading: true }));
+  mesh.position.set(E.cx, 0, E.cz);
+  levelGroup.add(mesh);
+  const step = size / segs, row = segs + 1;
+  return (x, z) => { // bilinear height from the grid
+    const gx = clamp((x - E.cx + size / 2) / step, 0, segs - 0.001), gz = clamp((z - E.cz + size / 2) / step, 0, segs - 0.001);
+    const ix = gx | 0, iz = gz | 0, fx = gx - ix, fz = gz - iz, at = (a, b) => heights[b * row + a];
+    return lerp(lerp(at(ix, iz), at(ix + 1, iz), fx), lerp(at(ix, iz + 1), at(ix + 1, iz + 1), fx), fz);
+  };
 }
 
 // palm trees, all drawn in one go: a trunk and seven drooping fronds each; spots are [x, z, y?]
@@ -2294,6 +2334,199 @@ function decoDelta(E) {
   };
 }
 
+function decoZuma(E) {
+  const sc = L.scale;
+  const at = (x, z) => nearestOn(MAIN, x * sc, z * sc, 0, N - 1).i;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new V3(0, 1, 0), col = new THREE.Color();
+  const flat = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), lambert({ color: 0x5fae45 }));
+  flat.rotation.x = -Math.PI / 2; flat.position.set(E.cx, -0.6, E.cz);
+  levelGroup.add(flat);
+
+  // the landscape: flat by the city, rising to a massif under the hairpins, rolling hills elsewhere
+  const mx = 110 * sc, mz = -330 * sc, city = new V3(40 * sc, 0, 0);
+  const natural = (x, z) => {
+    const massif = 62 * Math.exp(-((x - mx) ** 2 + (z - mz) ** 2) / (2 * 230 * 230));
+    const hills = 9 * (Math.sin(x * 0.009) * Math.cos(z * 0.011) + 0.6) * clamp((Math.hypot(x - city.x, z - city.z) - 220) / 300, 0, 1);
+    const edge = clamp((850 - Math.max(Math.abs(x - E.cx), Math.abs(z - E.cz))) / 150, 0, 1);
+    return (massif + Math.max(0, hills)) * edge;
+  };
+  const heightAt = addTerrain(E, natural, { size: 1700, segs: 170 });
+
+  // Zuma Rock: a vast granite dome with dark vertical streaks, looming over the climb
+  const prof = [[0, 1], [0.32, 0.975], [0.58, 0.9], [0.8, 0.72], [0.94, 0.45], [1.0, 0.18], [1.04, 0]].map(([r, h]) => new THREE.Vector2(r, h));
+  const rockGeo = new THREE.LatheGeometry(prof, 22);
+  const rp = rockGeo.attributes.position;
+  for (let i = 0; i < rp.count; i++) { const f = 1 + (hash(rp.getX(i) * 7.3 + rp.getZ(i) * 3.1 + rp.getY(i) * 11) - 0.5) * 0.06; rp.setX(i, rp.getX(i) * f); rp.setZ(i, rp.getZ(i) * f); }
+  rockGeo.computeVertexNormals();
+  const streaks = canvasTex(makeCanvas(256, 128, (g, w, h) => {
+    g.fillStyle = '#9a948c'; g.fillRect(0, 0, w, h);
+    for (let k = 0; k < 90; k++) { g.fillStyle = Math.random() < 0.6 ? 'rgba(50,45,42,0.35)' : 'rgba(200,190,175,0.3)'; g.fillRect(Math.random() * w, rand(0, h * 0.3), rand(1, 4), rand(h * 0.4, h)); }
+    g.fillStyle = 'rgba(70,90,50,0.5)'; g.fillRect(0, h * 0.9, w, h * 0.1);
+  }), 6, 1);
+  const zuma = new THREE.Mesh(rockGeo, lambert({ map: streaks, flatShading: true, fog: false }));
+  zuma.scale.set(150, 230, 120);
+  zuma.position.set(420 * sc, -2, -300 * sc); zuma.rotation.y = 0.5;
+  levelGroup.add(zuma);
+  addMountains(E, { colors: [0x7d9a74, 0x8aa58a, 0x9c9488], snow: 0, count: 20, h: [70, 160], w: [180, 280], y: -10 });
+
+  // the city by the start: modern towers in blue glass, trees along the boulevard
+  const glass = lambert({ map: canvasTex(makeCanvas(64, 128, (g, w, h) => {
+    g.fillStyle = '#d9e6ef'; g.fillRect(0, 0, w, h);
+    for (let y = 2; y < h; y += 8) for (let x = 2; x < w; x += 8) { g.fillStyle = Math.random() < 0.2 ? '#bcd9ec' : '#4a7ea8'; g.fillRect(x, y, 6, 6); }
+  })) });
+  const towers = roadside(E, MAIN, 34, 14, 30, at(-120, 0), at(170, 0)).filter(s => s[2] < 1);
+  const tMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), [glass, glass, lambert({ color: 0x8b9aa6 }), glass, glass, glass], Math.max(1, towers.length));
+  const tints = [0xffffff, 0xe6f2ff, 0xdfe9e0, 0xf2e6d8];
+  towers.forEach(([x, z, , h], n) => {
+    q.setFromAxisAngle(up, h);
+    const w = rand(16, 26);
+    tMesh.setMatrixAt(n, m.compose(new V3(x, 0, z), q, new V3(w, rand(22, 70), rand(16, 24))));
+    tMesh.setColorAt(n, col.setHex(tints[n % tints.length]));
+  });
+  levelGroup.add(tMesh);
+  addTrees(roadside(E, MAIN, 16, 3, 0, at(-120, 0), at(230, -30)).filter(s => s[2] < 1.5).map(s => [s[0], s[1]]), { roundP: 0.9, scale: [1, 1.3] });
+  // countryside trees on the terrain (savanna-like, scattered), standing on the ground
+  addTrees(E.spots(240, WALL + 8, 250, (x, z) => Math.hypot(x - city.x, z - city.z) > 260 && heightAt(x, z) < 70).map(([x, z]) => [x, z, heightAt(x, z)]),
+    { roundP: 0.75, hue: [0.2, 0.32], lig: [0.25, 0.38], scale: [0.9, 1.6] });
+  // boulders on the hillsides
+  const boulders = E.spots(80, WALL + 10, 120, (x, z) => heightAt(x, z) > 12);
+  const bMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), lambert({ color: 0x8d8a86, flatShading: true }), Math.max(1, boulders.length));
+  boulders.forEach(([x, z], n) => { const s = rand(2, 6); q.setFromEuler(new THREE.Euler(rand(0, 3), rand(0, 3), 0)); bMesh.setMatrixAt(n, m.compose(new V3(x, heightAt(x, z), z), q, new V3(s, s * 0.8, s))); });
+  levelGroup.add(bMesh);
+
+  // road signs: green gantries over the boulevard, chevrons on the hairpins
+  const signPole = lambert({ color: 0x6a7380 });
+  const gantry = (x, z, text, sub) => {
+    const i = at(x, z), span = wallL[i] + wallR[i] + 2, g = new THREE.Group();
+    const face = lambert({ map: canvasTex(PAINT.billboard(text, sub, '#0f6b3a', '#FFFFFF')) });
+    const board = new THREE.Mesh(new THREE.BoxGeometry(20, 5, 0.3), [signPole, signPole, signPole, signPole, signPole, face]);
+    board.position.y = 9.5;
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(span, 0.5, 0.5), signPole); beam.position.y = 12.3;
+    g.add(board, beam);
+    for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 12.5, 0.6), signPole); p.position.set(s * span / 2, 6.25, 0); g.add(p); }
+    placeOnTrack(g, i, (wallR[i] - wallL[i]) / 2);
+    levelGroup.add(g);
+  };
+  gantry(20, 0, 'ZUMA ROCK  ↑', 'Madalla · Suleja');
+  gantry(215, -18, 'ZUMA ROCK 5 km', 'Mountain road: drive with care');
+  const chev = lambert({ map: canvasTex(makeCanvas(128, 64, (g, w, h) => {
+    g.fillStyle = '#FFD23F'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#1B1330'; g.lineWidth = 12; g.lineJoin = 'miter';
+    for (const x of [30, 70]) { g.beginPath(); g.moveTo(x, 10); g.lineTo(x + 22, h / 2); g.lineTo(x, h - 10); g.stroke(); }
+  })), side: THREE.DoubleSide });
+  for (const [x, z] of [[22, -252], [214, -304]]) {
+    const i = at(x, z), t0 = TT[wi(i - 8)], t1 = TT[wi(i + 8)];
+    const outer = Math.sign((t1.x - t0.x) * TS[i].x + (t1.z - t0.z) * TS[i].z) > 0 ? -1 : 1; // outside of the bend
+    for (const d of [-14, -7, 0, 7, 14]) {
+      const j = wi(i + d), board = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.6), chev);
+      const s = outer > 0 ? 1 : -1;
+      placeOnTrack(board, j, s * ((s > 0 ? wallR[j] : wallL[j]) + 0.6), 1.9);
+      board.rotation.y += Math.PI;
+      if (s < 0) board.scale.x = -1;
+      levelGroup.add(board);
+    }
+  }
+
+  // the tunnel through a rock outcrop near the top
+  if (tunnel) {
+    const { i0, i1 } = tunnel;
+    const archW = j => (wallL[j] + wallR[j]) / 2 + 0.4, archC = j => (wallR[j] - wallL[j]) / 2;
+    sweep(i0, i1, 16, (j, s, a) => [archC(j) + Math.cos(Math.PI * a) * archW(j), Math.sin(Math.PI * a) * 13],
+      lambert({ map: canvasTex(PAINT.gravel('#7a726a', ['#6a625a', '#8a827a', '#5a524a']), 1, 1), side: THREE.DoubleSide }));
+    sweep(i0, i1, 16, (j, s, a) => {
+      const bump = Math.sin(Math.PI * s);
+      const w = archW(j) + 4 + 38 * bump * (0.85 + 0.3 * hash(a * 7.1 + s * 13.3));
+      const h = 15 + 40 * bump * (0.8 + 0.4 * hash(a * 3.3 + s * 29.7));
+      return [archC(j) + Math.cos(Math.PI * a) * w, Math.sin(Math.PI * a) * h - 2];
+    }, lambert({ color: 0x8d8a86, flatShading: true, side: THREE.DoubleSide }));
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0xffd27a });
+    for (let j = i0 + 10; j < i1 - 5; j += 22) for (const lat of [wallR[j] - 0.4, -wallL[j] + 0.4]) {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 3), lampMat);
+      placeOnTrack(lamp, j, lat, 7);
+      levelGroup.add(lamp);
+    }
+  }
+
+  // ---- falling rocks: in two marked stretches of the climb, rocks tumble down from the uphill side.
+  // A red ring shows where each will land; the host decides where they fall in an online race.
+  const zones = [[[185, -222], [85, -230]], [[160, -326], [60, -333]]].map(([a, b]) => {
+    const i0 = at(...a), i1 = at(...b), mid = wi(i0 + Math.round(wi(i1 - i0) / 2));
+    const side = Math.sign((mx - TP[mid].x) * TS[mid].x + (mz - TP[mid].z) * TS[mid].z) || 1; // towards the massif
+    return { i0, i1, side, t: rand(1, 3) };
+  });
+  const warn = lambert({ map: canvasTex(makeCanvas(128, 112, (g, w, h) => {
+    g.fillStyle = '#FFFFFF'; g.beginPath(); g.moveTo(w / 2, 4); g.lineTo(w - 4, h - 4); g.lineTo(4, h - 4); g.closePath(); g.fill();
+    g.strokeStyle = '#E8363C'; g.lineWidth = 10; g.stroke();
+    g.fillStyle = '#1B1330';
+    for (const [x, y, r] of [[52, 62, 9], [74, 76, 7], [60, 86, 6], [80, 52, 5]]) { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+  })), side: THREE.DoubleSide });
+  for (const z of zones) for (const j of [wi(z.i0 - 30), z.i0]) {
+    const s = new THREE.Group();
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(3, 2.6), warn); board.position.y = 3.6; board.rotation.y = Math.PI;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3, 6), signPole); pole.position.y = 1.5;
+    s.add(board, pole);
+    placeOnTrack(s, j, -z.side * (wallR[j] + 0.8));
+    levelGroup.add(s);
+  }
+  const rocks = [];
+  const ringGeo = new THREE.RingGeometry(3.6, 4.6, 28).rotateX(-Math.PI / 2);
+  const rockMeshGeo = new THREE.DodecahedronGeometry(1.8, 0), rockMat = lambert({ color: 0x8a7a6a, flatShading: true });
+  const dropRock = (i, lat) => {
+    const z = zones.find(z => wi(i - z.i0) <= wi(z.i1 - z.i0)) || zones[0];
+    const to = new V3(TP[i].x + TS[i].x * lat, TP[i].y, TP[i].z + TS[i].z * lat);
+    const w = z.side > 0 ? wallR[i] : wallL[i];
+    const from = new V3(TP[i].x + TS[i].x * z.side * (w + 30), TP[i].y + 28, TP[i].z + TS[i].z * z.side * (w + 30));
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+    ring.position.set(to.x, to.y + 0.08, to.z);
+    const mesh = new THREE.Mesh(rockMeshGeo, rockMat);
+    levelGroup.add(ring, mesh);
+    rocks.push({ t: 0, dur: 2.2, from, to, ring, mesh });
+  };
+  const clearRocks = () => { for (const r of rocks) { levelGroup.remove(r.ring, r.mesh); r.ring.material.dispose(); } rocks.length = 0; };
+
+  addClouds(E, 14);
+
+  return {
+    moving: [],
+    reset() { clearRocks(); for (const z of zones) z.t = rand(1, 3); },
+    bomb: dropRock, // online guests drop the rocks the host aims
+    update(dt, t) {
+      if (state === 'race' && karts.length && (!net || net.host)) {
+        for (const z of zones) {
+          // only while someone is in or nearly at this stretch
+          const k = karts.find(k => k.path === MAIN && wi(k.idx - z.i0 + 60) < wi(z.i1 - z.i0) + 60);
+          if (!k) continue;
+          z.t -= dt;
+          if (z.t > 0) continue;
+          z.t = rand(1.4, 2.6);
+          const ahead = wi(k.idx + Math.floor(rand(35, 70)) - z.i0);
+          if (ahead > wi(z.i1 - z.i0)) continue;
+          const i = wi(z.i0 + ahead), lat = r2(rand(-HALF + 2, HALF - 2));
+          dropRock(i, lat);
+          if (net) netSend({ t: 'bomb', r: net.race, i, lat });
+        }
+      }
+      for (let n = rocks.length - 1; n >= 0; n--) {
+        const r = rocks[n];
+        r.t += dt;
+        const u = Math.min(1, r.t / r.dur);
+        r.mesh.position.lerpVectors(r.from, r.to, u);
+        r.mesh.position.y += Math.sin(Math.PI * u) * 6 + 1.6;
+        r.mesh.rotation.x += dt * 6; r.mesh.rotation.z += dt * 4;
+        r.ring.material.opacity = 0.45 + 0.45 * Math.abs(Math.sin(t * 10));
+        r.ring.scale.setScalar(1.25 - 0.25 * u);
+        if (u >= 1) {
+          for (let q = 0; q < 10; q++) emit(dust, r.to.x + rand(-2, 2), r.to.y + 1, r.to.z + rand(-2, 2), rand(-4, 4), rand(2, 6), rand(-4, 4), 0x9a8a7a, 1.2, 4);
+          if (player && player.pos.distanceTo(r.to) < 80) { sfx.boom(); if (player.pos.distanceTo(r.to) < 22) shake = 0.3; }
+          for (const k of karts) { const dx = k.pos.x - r.to.x, dz = k.pos.z - r.to.z; if (dx * dx + dz * dz < 5 * 5) hitKart(k, null); }
+          levelGroup.remove(r.ring, r.mesh); r.ring.material.dispose();
+          rocks.splice(n, 1);
+        }
+      }
+    },
+  };
+}
+
 const LEVELS = [
   {
     name: 'Danfo Dash', tag: 'Lagos · City circuit', band: 'linear-gradient(180deg,#FFC21F 0 50%,#4e5159 50%)',
@@ -2344,6 +2577,26 @@ const LEVELS = [
     arch: { post: 0x5a3a1a, bg: '#0f4d4d', text: '#FFD23F', stripe: '#C2410C' },
     shoulder: () => PAINT.gravel('#b88a5a', ['#a87a4a', '#c99a6a', '#9a6c40']), slab: 0x9a8c76, base: 'flyover', deco: decoDelta, dust: 0x8a6a40, theme: 6,
     pads: [[0.1, 0], [0.4, 0], [0.72, 0], [0.95, 0]], boxes: [0.2, 0.55, 0.85],
+  },
+  {
+    name: 'Zuma Rock Circuit', tag: 'Abuja · Mountain circuit', band: 'linear-gradient(180deg,#4f9fe0 0 45%,#9a948c 45% 65%,#b5562f 65%)',
+    scale: 1.5, groundY: 0, hills: true,
+    cp: [[-60, 0, 0], [60, 0, 0], [160, 0, 0], [230, -30, 1], [268, -100, 4], [258, -175, 8], [205, -218, 12],
+      [130, -225, 15], [65, -231, 18], [38, -236, 19], [22, -252, 20], [38, -268, 21], [65, -273, 22],
+      [120, -280, 24], [172, -285, 26], [198, -289, 27], [214, -304, 28], [198, -319, 29], [172, -323, 29.5],
+      [110, -330, 32], [40, -335, 35], [-30, -332, 37], [-95, -315, 38],
+      [-150, -275, 34], [-190, -205, 26], [-205, -120, 16], [-185, -45, 6], [-130, -5, 1]],
+    // a narrow, rough mountain pass that cuts across the second hairpin
+    branches: [{ from: [132, -281], to: [132, -326], cp: [[154, -293, 26.8], [164, -304, 27.6], [154, -315, 28.4]], half: 4, gravel: true, ai: 0.3 }],
+    branchLook: { wall: ['#E8E6E0', '#E8363C', '#4a4a4a'], shoulder: () => PAINT.gravel('#b5562f', ['#a04a28', '#c4683c', '#8a3e20']) },
+    tunnelAt: [[-25, -333], [-92, -316]],
+    narrow: [{ from: [115, -280], to: [115, -328], wall: 14 }, { from: [80, -230], to: [80, -275], wall: 14 }], // guard rails tight round the hairpins
+    gravel: [[[30, -262], [62, -275]], [[-195, -185], [-204, -140]]],
+    sky: [0x4f9fe0, 0xe2eef6], fog: [300, 1100], hemi: [0xf4fbff, 0x6a7a3a, 0.95], sun: [0xfff2d8, 0.75],
+    road: ['#4d5058', '#FFFFFF', 'rgba(255,210,63,0.75)'], curb: ['#E8363C', '#FFFFFF'], wall: ['#E8E6E0', '#9aa0a8', '#4a4a4a'],
+    arch: { post: 0x0f6b3a, bg: '#0f6b3a', text: '#FFFFFF', stripe: '#E8363C' },
+    shoulder: () => PAINT.gravel('#9c5a3c', ['#8a4e34', '#ab6a4a', '#7d462e']), base: 'ground', deco: decoZuma, dust: 0xa0522d, theme: 7,
+    pads: [[0.06, 0], [0.3, 0], [0.82, 0], [0.92, 0]], boxes: [0.15, 0.48, 0.75],
   },
   {
     name: 'Pepper Hill', tag: 'Rolling green hills', band: 'linear-gradient(180deg,#8FD3F5 0 55%,#62B84A 55%)',
@@ -2455,6 +2708,9 @@ function buildLevel(li) {
   // plank sections: bumpy (see updateKart), drawn as boards
   PLANK = new Uint8Array(N);
   for (const [from, to] of L.planks || []) { const i0 = near(from), len = wi(near(to) - i0); for (let d = 0; d <= len; d++) PLANK[wi(i0 + d)] = 1; }
+  GRAVEL = new Uint8Array(N);
+  for (const [from, to] of L.gravel || []) { const i0 = near(from), len = wi(near(to) - i0); for (let d = 0; d <= len; d++) GRAVEL[wi(i0 + d)] = 1; }
+  if (L.tunnelAt) tunnel = { i0: near(L.tunnelAt[0]), i1: near(L.tunnelAt[1]) };
   BRANCHES = (L.branches || []).map((def, n) => buildBranch(def, n + 1));
   PATHS = [MAIN, ...BRANCHES];
   OBST = [];
@@ -2470,6 +2726,7 @@ function buildLevel(li) {
       }
     }
   }
+  MAIN.hideL = hideL; MAIN.hideR = hideR;
 
   // surfaces
   // the tarmac, kerbs and verge, trimmed to fit between the barriers where they're pulled in
@@ -2488,6 +2745,11 @@ function buildLevel(li) {
     const boards = lambert({ map: canvasTex(PAINT.planks(), 1, 1), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     ribbon(j => PLANK[j] ? -wallL[j] : 0, j => PLANK[j] ? wallR[j] : 0, 0.03, 0.03, 8, boards);
   }
+  if (L.gravel) {
+    // loose stones spread across the gravel sections
+    const stones = lambert({ map: canvasTex(PAINT.gravel('#a8846a', ['#8a6a52', '#c4a488', '#7a5a44', '#b5562f']), 3, 1), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    ribbon(j => GRAVEL[j] ? -wallL[j] : 0, j => GRAVEL[j] ? wallR[j] : 0, 0.03, 0.03, 8, stones);
+  }
   if (L.wet) {
     // a glossy wet sheen over the wet sections
     const sheen = new THREE.MeshPhongMaterial({ map: canvasTex(PAINT.puddles()), color: 0x8fb4d0, specular: 0xdfefff, shininess: 80, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
@@ -2502,7 +2764,7 @@ function buildLevel(li) {
     const G = B.gap, deck = j => !G || j <= G.g0 || j >= G.g1; // nothing across a jump's gap
     const w = (j, v) => deck(j) ? v : 0;
     ribbon(j => w(j, -B.half), j => w(j, B.half), 0.02, 0.02, B.half * 2,
-      lambert({ map: canvasTex(B.planks ? PAINT.planks() : PAINT.road(...(BL.road || L.road))), ...over }), levelGroup, B);
+      lambert({ map: canvasTex(B.planks ? PAINT.planks() : B.gravel ? PAINT.gravel('#a8846a', ['#8a6a52', '#c4a488', '#7a5a44', '#b5562f']) : PAINT.road(...(BL.road || L.road))), ...over }), levelGroup, B);
     if (B.wet) ribbon(-B.half, B.half, 0.04, 0.04, B.half * 2, new THREE.MeshPhongMaterial({ map: canvasTex(PAINT.puddles()), color: 0x8fb4d0, specular: 0xdfefff, shininess: 80, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }), levelGroup, B);
     const sh = lambert({ map: canvasTex(BL.shoulder ? BL.shoulder() : PAINT.gravel('#8a7a66', ['#7a6a56', '#9a8a76'])), ...over });
     ribbon(j => w(j, -B.wL[j]), j => w(j, -B.half), 0.01, 0.01, 6, sh, levelGroup, B);
@@ -2630,10 +2892,10 @@ function buildBranch(def, id) {
     const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1);
     slope[i] = (P[i1].y - P[i0].y) / ((i1 - i0) * seg);
   }
-  const B = { id, P, T, S, n, loop: false, half, wL: wLb, wR: wRb, slope, seg, a, b, sa, ai: def.ai ?? 0.35, wet: !!def.wet, planks: !!def.planks, gap };
+  const B = { id, P, T, S, n, loop: false, half, wL: wLb, wR: wRb, slope, seg, a, b, sa, ai: def.ai ?? 0.35, wet: !!def.wet, planks: !!def.planks, gravel: !!def.gravel, gap };
   const onMain = i => nearestOn(MAIN, P[i].x, P[i].z, a - 150, b + 150);
   // the mouths: the first and last samples whose lane still overlaps the main road and its barriers
-  const overlaps = i => Math.abs(onMain(i).lat) < WALL + half;
+  const overlaps = i => { const q = onMain(i); return Math.abs(q.lat) < (q.lat > 0 ? wallR[q.i] : wallL[q.i]) + half + 0.5; };
   let m0 = 0; while (m0 < n - 1 && overlaps(m0)) m0++;
   let m1 = n - 1; while (m1 > 0 && overlaps(m1)) m1--;
   B.mouthA = Math.min(n - 1, m0 + 2); B.mouthB = Math.max(0, m1 - 2);
@@ -2683,11 +2945,10 @@ function switchPath(o) {
     if (Math.abs(q.lat) < HALF - 0.5 || outSide || o.idx === 0 || o.idx === B.n - 1) { o.path = MAIN; o.idx = q.i; o.lat = q.lat; }
   }
 }
-// the barriers either side of a racer: none where a branch side runs open into the main road
+// the barriers either side of a racer: none where a road runs open into a shortcut's mouth
 function barrierLimits(o, margin) {
   const P = o.path, i = o.idx;
-  if (P === MAIN) return [-wallL[i] + margin, wallR[i] - margin];
-  return [P.hideL[i] ? -Infinity : -P.wL[i] + margin, P.hideR[i] ? Infinity : P.wR[i] - margin];
+  return [P.hideL && P.hideL[i] ? -Infinity : -P.wL[i] + margin, P.hideR && P.hideR[i] ? Infinity : P.wR[i] - margin];
 }
 
 function buildStart() {
@@ -3047,6 +3308,14 @@ const THEMES = [
     drums: { kick: 'x.....x...x.....', shaker: 'x.xxx.xxx.xxx.xx', tom: 'h.m.l...h..m.l..', bell: 'x...x.x...x.x...' },
     amb: 'creek',
   },
+  { // 7 Zuma Rock Circuit: big, bright and driving, for the climb and the fast run down
+    bpm: 136, scale: 'major', leadBase: 72, bassBase: 43, padBase: 55, chords: [0, 4, 5, 3, 0, 4, 3, 4],
+    lead: ['0...4...7...4.5.', '4...6...8---7...', '5...7...9...7.5.', '3...5...7-6-5-4.',
+      '7.7.9.7.4...2...', '6.6.8.6.4...1...', '5.4.3.5.7...9...', '8---7---6---4...'],
+    leadVoice: 'square', leadVol: 0.06, bass: 'R.RR.R.RR.RR.R5.', bassVoice: 'triBass', bassVol: 0.15, pad: true, padVol: 0.022,
+    drums: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'x.xxx.xxx.xxx.xx', tom: '............h.m.', fill: '....x.......xxxx' },
+    amb: 'hills',
+  },
 ];
 
 function playStep(th, s, t, sd) {
@@ -3125,6 +3394,15 @@ function startAmbience(kind) {
     tick = t => {
       if (Math.random() < 0.08) noiseHit(t, 'highpass', 3000, rand(0.015, 0.045), 0.02, ambBus);
       if (Math.random() < 0.004) noiseHit(t, 'lowpass', 90, 0.45, 1.8, ambBus, brownBuf);
+    };
+  } else if (kind === 'hills') {
+    // wind over open hills, birds, and a hawk's cry from up near the rock
+    const f = filt('bandpass', 420, 0.7), g = gain(0.06);
+    loop(noiseBuf).connect(f); f.connect(g); g.connect(ambBus);
+    lfo(0.08, 260, f.frequency); lfo(0.13, 0.03, g.gain);
+    tick = t => {
+      if (Math.random() < 0.008) { const base = rand(2600, 3800); for (let k = 0; k < 3; k++) blip(t + k * 0.1, 'sine', base, base * 1.25, 0.07, 0.03); }
+      if (Math.random() < 0.0015) blip(t, 'sine', 2300, 1500, 0.9, 0.028, 18);
     };
   } else if (kind === 'creek') {
     // still water, insects in the mangroves, a paddle splash and a bird now and then
@@ -3522,10 +3800,13 @@ function respawn(k) {
   k.h = k.vh = pathHeading(P, i); k.speed = 0; k.spin = 0; k.slickT = 0; k.drift.active = false; k.air = null; k.fall = 0;
 }
 
-// how well the tyres hold: 1 on dry tarmac, less on wet road or just after a puddle
+const onGravel = k => k.path.gravel || (k.path === MAIN && GRAVEL[k.idx]);
+const onBumps = k => k.path.planks || k.path.gravel || (k.path === MAIN && (PLANK[k.idx] || GRAVEL[k.idx]));
+// how well the tyres hold: 1 on dry tarmac, less on wet road, gravel, or just after a puddle
 function gripOf(k) {
   let g = 1;
   if (k.path.wet || (k.path === MAIN && WET[k.idx])) g = L.wetGrip || 0.4;
+  if (onGravel(k)) g = Math.min(g, 0.5);
   if (k.slickT > 0) g = Math.min(g, 0.22);
   return g;
 }
@@ -3549,6 +3830,9 @@ function updateKart(k, inp, dt) {
   if (k.boost > 0) { k.boost -= dt; max = C.max * 1.42; }
   if (k.mudT > 0) { k.mudT -= dt; max *= 0.6; }
   if (k.path.planks || (k.path === MAIN && PLANK[k.idx])) max *= 0.93;
+  if (onGravel(k)) max *= 0.88;
+  // hilly tracks: going downhill lets you run past your usual top speed
+  if (L.hills) { const sl = slopeAlong(k); if (sl < 0) max *= 1 + Math.min(0.2, -sl * 2.2); }
   const off = Math.abs(k.lat) > k.path.half + 1.4;
   if (off && k.boost <= 0) max *= 0.52;
 
@@ -3563,7 +3847,7 @@ function updateKart(k, inp, dt) {
   else if (throttle > 0) k.speed = k.speed < 0 ? k.speed + ACC * 2 * dt : Math.min(Math.max(k.speed, max), k.speed + ACC * dt * (1 - 0.35 * clamp(k.speed / max, 0, 1)));
   else if (throttle < 0) k.speed = Math.max(-12, k.speed - (k.speed > 0 ? BRAKE : ACC * 0.6) * dt);
   else { const d = COAST * dt; k.speed = Math.abs(k.speed) < d ? 0 : k.speed - Math.sign(k.speed) * d; }
-  k.speed -= slopeAlong(k) * 10 * dt;
+  k.speed -= slopeAlong(k) * (L.hills ? 24 : 10) * dt; // gravity: harder climbs on hilly tracks
   if (k.speed > max) k.speed = Math.max(max, k.speed - 40 * dt);
 
   // drift
@@ -3937,10 +4221,11 @@ function aiInput(k, dt) {
   let [Q, i2] = roadAhead(P, k.idx, look);
   // shortcuts: decide once per lap whether to take each one, then aim into its mouth
   if (P === MAIN) for (const B of BRANCHES) {
-    const d = wi(B.a - k.idx);
+    let d = B.a - k.idx; // samples to the shortcut's start: negative once level with its mouth
+    if (d > N / 2) d -= N; else if (d < -N / 2) d += N;
     if (d > 90 && d < 200 && ai.brLap !== k.lap) { ai.brLap = k.lap; ai.br = Math.random() < B.ai ? B : null; }
-    if (ai.br !== B || d > 200) continue;
-    if (d < look) { Q = B; i2 = Math.min(B.n - 1, look - d); lane = 0; }
+    if (ai.br !== B || d > 200 || d < -wi(B.winA[1] - B.a)) continue;
+    if (d < look) { Q = B; i2 = clamp(look - d, 0, B.n - 1); lane = 0; }
     else if (d < look + 70) lane = B.sa * (HALF - 3);
   }
   // steer round obstacles: find the nearest one in our lane, then the closest lane that clears it
@@ -3984,6 +4269,13 @@ function aiInput(k, dt) {
   const cdot = P.T[k.idx].dot(Qc.T[ic]);
   let throttle = 1;
   if (cdot < 0.3 && k.speed > CLASSES[cls].max * 0.8) throttle = 0;
+  // really sharp bends (hairpins): brake down to a speed that will make the turn
+  const [Qh, ih] = roadAhead(P, k.idx, 30);
+  const bend = Math.acos(clamp(P.T[k.idx].dot(Qh.T[ih]), -1, 1));
+  if (bend > 1.3) {
+    const vTurn = CLASSES[cls].max * clamp(1.6 - bend * 0.37, 0.45, 1);
+    if (k.speed > vTurn + 3) throttle = -1; else if (k.speed > vTurn) throttle = 0;
+  }
   if (blocked && k.speed > 10) throttle = 0; // no way past yet (traffic): ease off
   if (Math.abs(wrapA(des - k.h)) > 1.6) { throttle = -1; steer = -steer; }
   if (state === 'race' && k.spin <= 0 && Math.abs(k.speed) < 3) ai.stuck += dt; else ai.stuck = 0;
@@ -3991,7 +4283,10 @@ function aiInput(k, dt) {
   if (ai.stuck > 0.6 && !(ai.backT > 0)) { ai.backT = 0.8; ai.backs = (ai.backs || 0) + 1; }
   if (ai.backT > 0) { ai.backT -= dt; throttle = -1; steer = -steer; }
   if (k.speed > 15) ai.backs = 0;
-  if (ai.stuck > 3 || ai.backs > 3) { respawn(k); ai.stuck = 0; ai.backT = 0; ai.backs = 0; }
+  // facing the wrong way for a while (spun round against a wall): start over facing forwards
+  const tf = P.T[k.idx];
+  ai.wrongT = state === 'race' && k.spin <= 0 && Math.sin(k.h) * tf.x + Math.cos(k.h) * tf.z < -0.2 ? (ai.wrongT || 0) + dt : 0;
+  if (ai.stuck > 3 || ai.backs > 3 || ai.wrongT > 2.5) { respawn(k); ai.stuck = 0; ai.backT = 0; ai.backs = 0; ai.wrongT = 0; }
   let item = false;
   if (k.item && k.rolling <= 0) {
     ai.itemT -= dt;
@@ -4169,7 +4464,7 @@ function updateKartVisual(k, dt) {
   if (k.hopT > 0) { k.hopT -= dt; y = Math.sin(Math.PI * (1 - k.hopT / 0.28)) * 0.55; }
   const off = Math.abs(k.lat) > k.path.half + 1.4;
   if (off && Math.abs(k.speed) > 5) y += Math.random() * 0.08;
-  if ((k.path.planks || (k.path === MAIN && PLANK[k.idx])) && Math.abs(k.speed) > 8 && !k.air) { // rattling over boards
+  if (onBumps(k) && Math.abs(k.speed) > 8 && !k.air) { // rattling over boards or stones
     y += Math.random() * 0.14;
     if (k === player && !reducedMotion) shake = Math.max(shake, 0.07);
   }  m.body.position.y = y;
@@ -4202,6 +4497,10 @@ function updateKartVisual(k, dt) {
       m.body.localToWorld(tmpV.set(x, 0.3, -1.3));
       emit(dust, tmpV.x, tmpV.y, tmpV.z, rand(-1.5, 1.5) + x, rand(1.5, 3), rand(-1.5, 1.5), 0xe6f2ff, 0.45, 1.1, 6);
     }
+  }
+  if (!off && onGravel(k) && Math.abs(k.speed) > 10 && Math.random() < 0.6) { // dust off loose gravel
+    m.body.localToWorld(tmpV.set(rand(-1, 1), 0.2, -1.3));
+    emit(dust, tmpV.x, tmpV.y, tmpV.z, rand(-1.5, 1.5), rand(1, 2.5), rand(-1.5, 1.5), L.dust || 0x9b7b4a, 0.6, 1.4, 2);
   }
   if (off && Math.abs(k.speed) > 8 && Math.random() < 0.6) {
     m.body.localToWorld(tmpV.set(rand(-1, 1), 0.2, -1.3));
