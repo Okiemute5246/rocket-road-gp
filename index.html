@@ -5806,7 +5806,7 @@ function showResults() {
 }
 function renderResults() {
   if (gp && gp.final) { // overall standings
-    $('#resBody').innerHTML = gpStandings().map((d, i) => `<tr class="${d === playerDef ? 'me' : ''}"><td class="p">${i + 1}</td><td><i style="background:${hexCss(ROSTER[d].color)}"></i>${d === playerDef ? 'You (' + ROSTER[d].name + ')' : ROSTER[d].name}</td><td class="t">${gp.pts[d]} pts</td></tr>`).join('');
+    $('#resBody').innerHTML = gpStandings().map((d, i) => `<tr class="${d === playerDef ? 'me' : ''}"><td class="p">${i + 1}</td><td><i style="background:${hexCss(ROSTER[d].color)}"></i>${d === playerDef ? 'You (' + ROSTER[d].name + ')' : ROSTER[d].name}</td><td class="t">${gp.pts[d]} ${gp.pts[d] === 1 ? 'pt' : 'pts'}</td></tr>`).join('');
     return;
   }
   const order = updateRanks();
@@ -5814,7 +5814,7 @@ function renderResults() {
   if (gp && $('#gpLine')) { // where the player would stand overall if the race ended now
     const tot = order.map(k => gp.pts[ROSTER.indexOf(k.def)] + GP_POINTS[k.rank - 1]);
     const mine = tot[order.indexOf(player)], pos = 1 + tot.filter(v => v > mine).length;
-    $('#gpLine').textContent = `Grand Prix: ${pos}${ORD[pos - 1]} overall with ${mine} points`;
+    $('#gpLine').textContent = `Grand Prix: ${pos}${ORD[pos - 1]} overall with ${mine} ${mine === 1 ? 'point' : 'points'}`;
   }
 }
 
