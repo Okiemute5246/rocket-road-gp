@@ -1,6 +1,6 @@
-# Rocket Road GP
+# OYA KART!
 
-A 3D kart racer that runs in the browser. Race five computer rivals over three laps, or up to five friends online. Drift for mini-turbos, grab items and unlock all four tracks.
+A 3D kart racer that runs in the browser. Race five computer rivals over three laps, or up to five friends online. Drift for mini-turbos, grab items and unlock every track.
 
 ![Title screen](screenshots/01-title.png)
 
@@ -16,10 +16,11 @@ A 3D kart racer that runs in the browser. Race five computer rivals over three l
 
 | # | Track | Setting |
 |---|-------|---------|
-| 1 | Pepper Hill | Rolling green hills |
-| 2 | Cloud Nine Skyway | A floating road above the clouds |
-| 3 | Coral Causeway | A bridge over the sea |
-| 4 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
+| 1 | Danfo Dash | Lagos streets, markets and a flyover over the lagoon. Yellow danfo buses drive laps in the outer lanes and spin you out if you hit them; parked cars, potholes and roadworks narrow the road. A service lane behind the market stalls is a shortcut, but it's narrow and has parked cars in it |
+| 2 | Pepper Hill | Rolling green hills |
+| 3 | Cloud Nine Skyway | A floating road above the clouds |
+| 4 | Coral Causeway | A bridge over the sea |
+| 5 | Magma Mountain | A tunnel and an erupting volcano that throws lava bombs |
 
 Finish a track in the top 3 to unlock the next one. Progress is saved in your browser, and **Reset progress** on the title screen locks the tracks again.
 
