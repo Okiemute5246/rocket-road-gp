@@ -189,6 +189,7 @@
   }
   .chip { display: flex; align-items: center; gap: 10px; padding: 8px 10px; text-align: left; min-width: 0; }
   .chip i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--paper); flex: none; }
+  .chip i.face { width: 38px; height: 38px; }
   .chip small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
   .chip[aria-pressed="true"], .seg button[aria-pressed="true"], .trk[aria-pressed="true"] { border-color: var(--sun); background: #3A2C6A; box-shadow: inset 0 0 0 1px var(--sun); }
   .tracks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -452,6 +453,7 @@
     .chip { padding: 5px 6px; gap: 6px; font-size: 13px; }
     .chip small { display: none; }
     .chip i { width: 16px; height: 16px; }
+    .chip i.face { width: 26px; height: 26px; }
     .seg { gap: 6px; }
     .seg button { padding: 5px 4px; font-size: 13px; }
     .seg button small { display: none; }
@@ -4637,13 +4639,37 @@ function toggleSfx() {
 }
 
 // ------------------------------------------------------------------ karts
+// The six drivers. Each keeps one of the original kart colours; the look describes the driver.
 const ROSTER = [
-  { name: 'Rosa', tag: 'Red rocket', color: 0xE8363C, helmet: 0xFFFFFF, suit: 0x1B1330 },
-  { name: 'Bolt', tag: 'Yellow flash', color: 0xFFC21F, helmet: 0x1B1330, suit: 0x2D6BFF },
-  { name: 'Mint', tag: 'Green machine', color: 0x2EC27E, helmet: 0xFFFFFF, suit: 0x0f5a3a },
-  { name: 'Pip', tag: 'Pink streak', color: 0xFF6FB5, helmet: 0xFFE4F1, suit: 0x7B2D5A },
-  { name: 'Rook', tag: 'Purple haze', color: 0x7B4DFF, helmet: 0xD9CCFF, suit: 0x1B1330 },
-  { name: 'Tango', tag: 'Orange peel', color: 0xFF8A1F, helmet: 0x3A2400, suit: 0xFFD23F },
+  { id: 'omo-turbo', name: 'Omo Turbo', tag: 'Speed demon', color: 0xFFC21F, look: {
+    skin: 0x8a5a3b, hair: 0x17110e, hairStyle: 'short', top: 0x1E6BFF, legs: 0x262a33, shoe: 0xF4F6FF, sole: 0x1E6BFF,
+    deco: { stripes: 0xF4F6FF, zip: 0xF4F6FF, collar: 0xF4F6FF, hem: 0xF4F6FF, cuff: 0xF4F6FF },
+    face: { iris: '#5a3216', brows: 'confident', mouth: 'grin' } } },
+  { id: 'odogwu', name: 'Odogwu', tag: 'Boss of the track', color: 0xFF8A1F, look: {
+    skin: 0x4e2f1f, hair: 0x110b09, hairStyle: 'twists', top: 0xFF7A1A, legs: 0x2f3138, shoe: 0x2f3138, sole: 0xFF7A1A, build: 1.12,
+    headScale: [1.02, 1.04, 0.97],
+    deco: { band: 0x2f3138, zip: 0x2f3138, collar: 0x2f3138, hem: 0x2f3138, cuff: 0x2f3138 },
+    face: { iris: '#3d2412', brows: 'strong', mouth: 'smirk' } } },
+  { id: 'smallie', name: 'Smallie', tag: 'Playful underdog', color: 0x2EC27E, look: {
+    skin: 0x7a4a2e, hair: 0x1a120d, hairStyle: 'afro', top: 0x9BE22D, legs: 0x2a2a35, shoe: 0xFF4FA3, sole: 0x2EC2E0,
+    oversize: true, scale: 0.88, headScale: [1.08, 1.12, 1.03],
+    deco: { hood: true, strings: 0xF5EBC8, collar: 0xF5EBC8, hem: 0xF5EBC8, cuff: 0xF5EBC8 },
+    face: { iris: '#5a3216', brows: 'raised', mouth: 'open', wink: true, blush: true } } },
+  { id: 'sisi-pepper', name: 'Sisi Pepper', tag: 'Fiery competitor', color: 0xE8363C, look: {
+    skin: 0x8d5b3c, hair: 0x161010, hairStyle: 'ponytail', top: 0xE02A2A, legs: 0x18161c, shoe: 0xF4F4F4, sole: 0xE02A2A, hightop: true,
+    build: 0.92, headScale: [0.97, 1.04, 0.95],
+    deco: { stripes: 0xF4F4F4, band: 0x18161c, collar: 0x18161c, hem: 0x18161c, cuff: 0xF4F4F4, tie: 0xE02A2A },
+    face: { iris: '#4a2a14', brows: 'fierce', mouth: 'smile', lashes: true, lip: '#8a3a3a' } } },
+  { id: 'madam-cruise', name: 'Madam Cruise', tag: 'Cool trickster', color: 0x7B4DFF, look: {
+    skin: 0x6e4430, hair: 0x1c130f, hairStyle: 'curls', top: 0x7B4DFF, legs: 0x1f1a2e, shoe: 0xC9B5FF, sole: 0xFFC21F,
+    oversize: true, build: 0.95, headScale: [0.97, 1.04, 0.95],
+    deco: { zip: 0xC9B5FF, collar: 0xC9B5FF, hem: 0xC9B5FF, cuff: 0xC9B5FF, shades: 0x2a1f45 },
+    face: { iris: '#4a2a14', brows: 'arched', mouth: 'smirk', lashes: true, cool: true, lip: '#7a3a4a' } } },
+  { id: 'kiki-vroom', name: 'Kiki Vroom', tag: 'Speed queen', color: 0xFF6FB5, look: {
+    skin: 0x7d4f33, hair: 0xD0612A, hairStyle: 'braids', top: 0x1F6B45, legs: 0x1d1d24, shoe: 0xB8652F, sole: 0xF2E6C8, hightop: true,
+    oversize: true, build: 0.92, headScale: [0.97, 1.04, 0.95],
+    deco: { band: 0xC8743A, collar: 0xF2E6C8, hem: 0xC8743A, cuff: 0xF2E6C8, bead: 0xF2E6C8 },
+    face: { iris: '#5a3216', brows: 'happy', mouth: 'grin', lashes: true, blush: true } } },
 ];
 const hexCss = h => '#' + h.toString(16).padStart(6, '0');
 
@@ -4655,28 +4681,343 @@ const shadowTex = new THREE.CanvasTexture(makeCanvas(64, 64, (g, w, h) => {
 const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
 const darkMat = lambert({ color: 0x22222a });
 const metalMat = lambert({ color: 0xc4c8d4 });
-const skinMat = lambert({ color: 0xf2c79a });
+
+// ------------------------------------------------------------------ drivers
+// Low-poly drivers in the style of the reference art: faceted shapes with flat shading, a painted
+// face that lines up with the head's facets, a hairstyle, a jacket with trim, and arms that hold the
+// steering wheel and follow it as the kart steers.
+const HEAD_R = 0.34, UP = new V3(0, 1, 0);
+// flat shading for the Lambert material: split the faces so each one gets its own normal
+const facet = g => { const n = g.index ? g.toNonIndexed() : g; if (n !== g) g.dispose(); n.computeVertexNormals(); return n; };
+// a point on a head-sized sphere, using the same angles as THREE.SphereGeometry (phi = PI/2 faces forward)
+const onHead = (r, th, ph) => new V3(-r * Math.cos(ph) * Math.sin(th), r * Math.cos(th), r * Math.sin(ph) * Math.sin(th));
+const isFront = ph => { ph = ((ph % TAU) + TAU) % TAU; return ph > 0.45 && ph < 2.7; };
+const limbV = new V3();
+function setLimb(m, a, b) {
+  limbV.subVectors(b, a);
+  const len = limbV.length();
+  m.position.addVectors(a, b).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(UP, limbV.divideScalar(len || 1));
+  m.scale.set(1, len, 1);
+}
+
+// eyebrows: [outer y, inner y, arch, thickness] for the left and right brow on the face canvas
+const BROWS = {
+  confident: [[50, 52, -7, 7], [50, 52, -7, 7]],
+  strong: [[46, 57, -4, 10], [46, 57, -4, 10]],
+  raised: [[53, 44, -8, 7], [53, 44, -8, 7]],
+  fierce: [[44, 58, -2, 6], [44, 58, -2, 6]],
+  arched: [[52, 52, -8, 5], [42, 50, -10, 5]],
+  happy: [[53, 48, -8, 5], [53, 48, -8, 5]],
+};
+const faceTex = new Map();
+// The face is painted on a canvas that wraps the front of the head: 120 degrees across, from the
+// hairline down to the chin. Eyes sit on the head's equator.
+function faceTexture(def) {
+  if (faceTex.has(def)) return faceTex.get(def);
+  const lk = def.look, f = lk.face, skin = new THREE.Color(lk.skin);
+  const skinCss = '#' + skin.getHexString(), shade = '#' + skin.clone().multiplyScalar(0.7).getHexString();
+  const ink = '#1b0f12';
+  const c = makeCanvas(256, 160, g => {
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    const ell = (x, y, rx, ry) => { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, TAU); g.fill(); };
+    if (f.blush) { g.fillStyle = 'rgba(255,120,130,0.22)'; ell(80, 114, 15, 7); ell(176, 114, 15, 7); }
+    // eyebrows
+    BROWS[f.brows].forEach(([yo, yi, arch, lw], n) => {
+      const s = n ? 1 : -1, xo = 128 + s * 66, xi = 128 + s * 20;
+      g.strokeStyle = ink; g.lineWidth = lw;
+      g.beginPath(); g.moveTo(xo, yo); g.quadraticCurveTo((xo + xi) / 2, Math.min(yo, yi) + arch, xi, yi); g.stroke();
+    });
+    // eyes: big anime eyes with a two-tone iris and two highlights
+    for (const s of [-1, 1]) {
+      const cx = 128 + s * 42, cy = 88, inner = cx - s * 16, outer = cx + s * 18;
+      g.strokeStyle = ink;
+      if (f.wink && s > 0) { // a closed, smiling eye
+        g.lineWidth = 6; g.beginPath(); g.moveTo(cx - 16, cy + 4); g.quadraticCurveTo(cx, cy - 14, cx + 16, cy + 4); g.stroke();
+        continue;
+      }
+      g.save();
+      g.beginPath(); g.ellipse(cx, cy, 17, 21, 0, 0, TAU); g.fillStyle = '#fff'; g.fill(); g.clip();
+      g.fillStyle = f.iris; ell(cx + s, cy + 3, 13, 17);
+      g.fillStyle = 'rgba(0,0,0,0.35)'; ell(cx, cy - 9, 15, 9);
+      g.fillStyle = '#0d0706'; ell(cx + s, cy + 4, 6.5, 9);
+      g.fillStyle = '#fff'; ell(cx - 5, cy - 4, 4.5, 5); ell(cx + 5, cy + 10, 2.2, 2.2);
+      if (f.cool) { g.fillStyle = skinCss; g.fillRect(cx - 20, cy - 24, 40, 16); } // relaxed, half-closed lids
+      g.restore();
+      const top = f.cool ? cy - 10 : cy - 26;
+      g.lineWidth = f.lashes ? 6 : 4.5;
+      g.beginPath(); g.moveTo(inner, cy - 5); g.quadraticCurveTo(cx, top, outer, cy - 4); g.stroke();
+      if (f.lashes) {
+        g.lineWidth = 4;
+        g.beginPath(); g.moveTo(outer - s * 2, cy - 5); g.lineTo(outer + s * 7, cy - 12); g.stroke();
+        g.beginPath(); g.moveTo(outer - s * 7, cy - 11); g.lineTo(outer + s * 1, cy - 19); g.stroke();
+      }
+      g.lineWidth = 2; g.strokeStyle = 'rgba(27,15,18,0.55)';
+      g.beginPath(); g.moveTo(cx - 11, cy + 19); g.quadraticCurveTo(cx, cy + 24, cx + 11, cy + 19); g.stroke();
+    }
+    // nose
+    g.strokeStyle = shade; g.lineWidth = 3.5;
+    g.beginPath(); g.moveTo(121, 110); g.quadraticCurveTo(128, 117, 135, 110); g.stroke();
+    // mouth
+    const open = (x0, x1, top, depth, tongue) => {
+      g.beginPath(); g.moveTo(x0, top); g.quadraticCurveTo(128, top + 5, x1, top); g.quadraticCurveTo(128, top + depth, x0, top);
+      g.fillStyle = '#5c1a22'; g.fill();
+      g.save(); g.clip();
+      g.fillStyle = '#fff'; g.fillRect(x0 - 4, top - 6, x1 - x0 + 8, 10);
+      if (tongue) { g.fillStyle = '#e0606a'; ell(128, top + depth * 0.5, 10, 6); }
+      g.restore();
+    };
+    if (f.mouth === 'grin') open(107, 149, 125, 26);
+    else if (f.mouth === 'open') open(109, 147, 122, 36, true);
+    else if (f.mouth === 'smirk') {
+      g.strokeStyle = f.lip || '#3a1a1a'; g.lineWidth = f.lip ? 6 : 4.5;
+      g.beginPath(); g.moveTo(112, 130); g.quadraticCurveTo(132, 138, 148, 123); g.stroke();
+      g.strokeStyle = ink; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(112, 130); g.quadraticCurveTo(132, 137, 148, 123); g.stroke();
+    } else { // a closed, determined smile
+      g.fillStyle = f.lip || shade;
+      g.beginPath(); g.moveTo(110, 127); g.quadraticCurveTo(128, 141, 146, 127); g.quadraticCurveTo(128, 132, 110, 127); g.fill();
+      g.strokeStyle = ink; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(110, 127); g.quadraticCurveTo(128, 135, 146, 127); g.stroke();
+    }
+  });
+  const t = new THREE.CanvasTexture(c);
+  faceTex.set(def, t);
+  return t;
+}
+
+function makeDriver(def) {
+  const lk = def.look, d = lk.deco, big = lk.oversize ? 0.035 : 0;
+  const mats = new Map();
+  const mat = c => { if (!mats.has(c)) mats.set(c, lambert({ color: c })); return mats.get(c); };
+  const put = (geo, color, x, y, z, parent) => {
+    const m = new THREE.Mesh(facet(geo), mat(color));
+    m.position.set(x, y, z); parent.add(m); return m;
+  };
+  const limbGeo = r => facet(new THREE.CylinderGeometry(r, r * 0.9, 1, 6));
+  const root = new THREE.Group(), upper = new THREE.Group(), head = new THREE.Group();
+
+  // ---- head: faceted skull, painted face, hair
+  head.add(new THREE.Mesh(facet(new THREE.SphereGeometry(HEAD_R, 12, 10)), mat(lk.skin)));
+  // the face covers 4 x 4 of the head's facets exactly, so it sits flush on them
+  head.add(new THREE.Mesh(facet(new THREE.SphereGeometry(HEAD_R * 1.006, 4, 4, Math.PI / 6, Math.PI * 2 / 3, Math.PI * 0.3, Math.PI * 0.4)),
+    new THREE.MeshLambertMaterial({ map: faceTexture(def), transparent: true, polygonOffset: true, polygonOffsetFactor: -2 })));
+  for (const s of [-1, 1]) put(new THREE.IcosahedronGeometry(0.07, 0), lk.skin, s * HEAD_R * 0.97, -0.03, -0.02, head).scale.set(0.6, 1, 0.8); // ears
+  const cap = (th, r) => put(new THREE.SphereGeometry(HEAD_R * r, 12, 10, 0, TAU, 0, th), lk.hair, 0, 0, 0, head);
+  const back = (ph0, len, th, r) => put(new THREE.SphereGeometry(HEAD_R * r, Math.round(len / (Math.PI / 6)), 10, ph0, len, 0, th), lk.hair, 0, 0, 0, head);
+  const chain = (pts, r, color, bead, parent) => { // a braid: a row of small faceted beads along a curve
+    const curve = new THREE.CatmullRomCurve3(pts), n = Math.max(3, Math.round(curve.getLength() / r));
+    for (let i = 0; i <= n; i++) {
+      const p = curve.getPoint(i / n), end = i === n && bead;
+      put(new THREE.IcosahedronGeometry(end ? r * 1.2 : r, 0), end ? bead : color, p.x, p.y, p.z, parent).rotation.set(i * 0.7, i * 0.9, 0);
+    }
+  };
+  let sway = null;
+  const swayAt = (x, y, z) => { sway = new THREE.Group(); sway.userData.at = new V3(x, y, z); return sway; };
+  switch (lk.hairStyle) {
+    case 'short': // short, textured
+      cap(Math.PI * 0.3, 1.05); back(Math.PI, Math.PI, Math.PI * 0.56, 1.05);
+      for (let i = 0; i < 40; i++) { // small tufts, half sunk into the cap
+        const th = 0.02 * Math.PI + hash(i + 1) * 0.27 * Math.PI, ph = hash(i + 50) * TAU;
+        const p = onHead(HEAD_R * 1.04, th, ph);
+        put(new THREE.TetrahedronGeometry(0.04, 0), lk.hair, p.x, p.y, p.z, head).rotation.set(hash(i + 9) * 3, hash(i + 7) * 3, 0);
+      }
+      break;
+    case 'twists':
+      cap(Math.PI * 0.3, 1.04); back(Math.PI, Math.PI, Math.PI * 0.56, 1.04);
+      for (let i = 0; i < 64; i++) { // short twists, standing up rather than straight out
+        const th = 0.03 * Math.PI + hash(i + 1) * 0.42 * Math.PI, ph = hash(i + 50) * TAU;
+        if (isFront(ph) && th > 0.27 * Math.PI) continue;
+        const n = onHead(1, th, ph), p = n.clone().multiplyScalar(HEAD_R * 1.04 + 0.035);
+        put(new THREE.CylinderGeometry(0.024, 0.038, 0.1, 5), lk.hair, p.x, p.y, p.z, head).quaternion.setFromUnitVectors(UP, n.add(new V3(0, 0.9, 0)).normalize());
+      }
+      break;
+    case 'afro':
+      cap(Math.PI * 0.3, 1.06); back(Math.PI * 5 / 6, Math.PI * 4 / 3, Math.PI * 0.58, 1.06);
+      put(new THREE.IcosahedronGeometry(0.45, 1), lk.hair, 0, 0.21, -0.1, head).scale.set(1.05, 0.88, 0.98);
+      break;
+    case 'ponytail': { // braids pulled up into a high ponytail
+      cap(Math.PI * 0.32, 1.04); back(Math.PI, Math.PI, Math.PI * 0.6, 1.04);
+      const tie = onHead(HEAD_R * 1.02, 0.32, Math.PI * 1.5);
+      put(new THREE.TorusGeometry(0.06, 0.026, 5, 8), d.tie, tie.x, tie.y + 0.02, tie.z, head).rotation.x = Math.PI / 2 - 0.4;
+      swayAt(tie.x, tie.y + 0.03, tie.z);
+      for (const [n, dx] of [-0.05, -0.025, 0, 0.025, 0.05].entries()) {
+        const k = 1 + hash(n) * 0.1;
+        chain([new V3(dx, 0, 0), new V3(dx * 1.5, 0.12 * k, -0.12), new V3(dx * 2, 0.06, -0.33 * k), new V3(dx * 2.2, -0.2 * k, -0.45), new V3(dx * 2, -0.46 * k, -0.47)], 0.045, lk.hair, null, sway);
+      }
+      break;
+    }
+    case 'curls': // shoulder-length natural curls
+      cap(Math.PI * 0.32, 1.08); back(Math.PI * 5 / 6, Math.PI * 4 / 3, Math.PI * 0.62, 1.08);
+      for (let i = 0; i < 52; i++) {
+        const ph = Math.PI * 5 / 6 + hash(i) * Math.PI * 4 / 3, y = 0.32 - hash(i + 31) * 0.78;
+        const rr = y > -0.08 ? Math.sqrt(Math.max(HEAD_R * HEAD_R - y * y, 0)) * 1.1 + 0.04 : 0.33 + (-0.08 - y) * 0.3;
+        put(new THREE.IcosahedronGeometry(0.07 + hash(i + 77) * 0.04, 0), lk.hair, -rr * Math.cos(ph), y, rr * Math.sin(ph), head).rotation.set(i, i * 2, 0);
+      }
+      for (let i = 0; i < 16; i++) {
+        const p = onHead(HEAD_R * 1.1, hash(i + 200) * Math.PI * 0.3, hash(i + 300) * TAU);
+        put(new THREE.IcosahedronGeometry(0.08 + hash(i + 400) * 0.03, 0), lk.hair, p.x, p.y, p.z, head).rotation.set(i, i * 3, 0);
+      }
+      if (d.shades) { // sunglasses pushed up into the curls
+        for (const s of [-1, 1]) put(new THREE.BoxGeometry(0.13, 0.07, 0.03), d.shades, s * 0.075, 0.33, 0.21, head).rotation.x = -0.75;
+        put(new THREE.BoxGeometry(0.06, 0.02, 0.02), d.shades, 0, 0.34, 0.215, head).rotation.x = -0.75;
+      }
+      break;
+    case 'braids': { // long braids with beads at the ends
+      cap(Math.PI * 0.32, 1.05); back(Math.PI * 5 / 6, Math.PI * 4 / 3, Math.PI * 0.6, 1.05);
+      swayAt(0, 0.05, -0.1);
+      const phis = [0.9, 1.05, 1.18, 1.31, 1.44, 1.56, 1.69, 1.82, 1.95, 2.1].map(p => p * Math.PI);
+      phis.forEach((ph, n) => {
+        const side = Math.abs(ph - Math.PI * 1.5) > Math.PI * 0.5; // the two framing the face are shorter
+        const s = onHead(HEAD_R * 1.05, Math.PI * 0.58, ph).sub(sway.userData.at);
+        const out = new V3(s.x, 0, s.z).normalize();
+        const len = (side ? 0.32 : 0.42) + hash(n + 5) * 0.06;
+        chain([s, s.clone().addScaledVector(out, 0.05).add(new V3(0, -0.12, 0)), s.clone().addScaledVector(out, 0.07).add(new V3(0, -len * 0.6, -0.03)),
+          s.clone().addScaledVector(out, 0.07).add(new V3(0, -len, -0.05))], 0.04, lk.hair, d.bead, sway);
+      });
+      break;
+    }
+  }
+  if (sway) {
+    mergeStatic(sway, []);
+    sway.position.copy(sway.userData.at);
+    head.add(sway);
+  }
+  mergeStatic(head, sway ? [sway] : []);
+  head.scale.set(...(lk.headScale || [1, 1.05, 0.96]));
+  head.position.set(0, 0.98, 0.06);
+
+  // ---- body: an eight-sided jacket with flat faces front and back, so stripes sit flush
+  const TH = 0.62, rB = 0.33 * (lk.build || 1) + big, rT = 0.28 * (lk.build || 1) + big;
+  const rAt = y => rB + (rT - rB) * y / TH;
+  const hoop = (rt, rb, h, y, color) => { const m = put(new THREE.CylinderGeometry(rt, rb, h, 8, 1, false, Math.PI / 8), color, 0, y, 0, upper); m.scale.z = 0.72; return m; };
+  const ring = (y, h, color) => hoop(rAt(y) + 0.014, rAt(y) + 0.014, h, y, color);
+  hoop(rT, rB, TH, TH / 2, lk.top);
+  if (d.hem) ring(0.05, 0.1, d.hem);
+  if (d.band) ring(0.38, 0.1, d.band);
+  if (d.stripes) for (const s of [-1, 1]) for (const f of [-1, 1]) {
+    put(new THREE.BoxGeometry(0.045, TH - 0.06, 0.02), d.stripes, s * 0.065, TH / 2, f * (rAt(TH / 2) * Math.cos(Math.PI / 8) * 0.72 + 0.01), upper);
+  }
+  if (d.zip) put(new THREE.BoxGeometry(0.025, TH - 0.08, 0.02), d.zip, 0, TH / 2, rAt(TH / 2) * Math.cos(Math.PI / 8) * 0.72 + 0.01, upper);
+  put(new THREE.CylinderGeometry(0.15 + big, 0.2 + big, 0.09, 8, 1, false, Math.PI / 8), d.collar || lk.top, 0, TH + 0.01, 0, upper).scale.z = 0.8;
+  put(new THREE.CylinderGeometry(0.07, 0.08, 0.18, 6), lk.skin, 0, TH + 0.09, 0.02, upper);
+  const shX = rT * Math.cos(Math.PI / 8) + 0.03;
+  for (const s of [-1, 1]) put(new THREE.IcosahedronGeometry(0.1 + big, 0), lk.top, s * shX, TH - 0.06, 0, upper);
+  if (d.hood) put(new THREE.SphereGeometry(0.2 + big, 8, 5), lk.top, 0, TH - 0.03, -0.18, upper).scale.set(1.15, 0.7, 0.75);
+  if (d.strings) for (const s of [-1, 1]) put(new THREE.BoxGeometry(0.022, 0.17, 0.022), d.strings, s * 0.05, TH - 0.14, rAt(TH - 0.14) * Math.cos(Math.PI / 8) * 0.72 + 0.02, upper);
+  upper.add(head);
+  mergeStatic(upper, [head]);
+  upper.position.set(0, 0.92, -0.42);
+  upper.rotation.x = 0.1; // leaning in towards the wheel
+  if (lk.scale) upper.scale.setScalar(lk.scale);
+  root.add(upper);
+
+  // ---- legs and sneakers
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const hip = new V3(s * 0.15, 0.95, -0.36), knee = new V3(s * 0.19, 1.07, 0.3), ankle = new V3(s * 0.2, 0.9, 0.72);
+    for (const [a, b, r] of [[hip, knee, 0.1], [knee, ankle, 0.085]]) {
+      const m = new THREE.Mesh(limbGeo(r), mat(lk.legs)); setLimb(m, a, b); root.add(m); legs.push(m);
+    }
+    const shoeH = lk.hightop ? 0.24 : 0.15;
+    put(new THREE.BoxGeometry(0.17, shoeH, 0.3), lk.shoe, s * 0.2, 0.795 + shoeH / 2, 0.84, root);
+    put(new THREE.BoxGeometry(0.19, 0.05, 0.33), lk.sole, s * 0.2, 0.79, 0.85, root);
+  }
+
+  // ---- steering wheel, which turns with the steering
+  const pivot = new THREE.Group(), spin = new THREE.Group();
+  spin.add(new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.045, 6, 14), darkMat));
+  for (const r of [0, Math.PI * 2 / 3, Math.PI * 4 / 3]) {
+    const sp = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.03), darkMat);
+    sp.position.set(Math.sin(r) * 0.13, -Math.cos(r) * 0.13, 0); sp.rotation.z = r; spin.add(sp);
+  }
+  spin.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 8).rotateX(Math.PI / 2), mat(def.color)));
+  mergeStatic(spin, []);
+  pivot.position.set(0, 1.25, 0.45); pivot.rotation.x = -0.7;
+  pivot.add(spin); root.add(pivot);
+
+  // ---- arms: shoulder to hand, re-aimed every frame
+  const arms = [-1, 1].map(s => {
+    const a = {
+      s, shoulder: new V3(s * shX, TH - 0.08, 0.02), grip: new V3(s * 0.235, 0.09, 0.03),
+      up: new THREE.Mesh(limbGeo(0.075 + big), mat(lk.top)), fore: new THREE.Mesh(limbGeo(0.068 + big), mat(lk.top)), hand: new THREE.Group(),
+    };
+    put(new THREE.CylinderGeometry(0.08 + big, 0.08 + big, 0.07, 6), d.cuff || lk.top, 0, -0.05, 0, a.hand);
+    put(new THREE.IcosahedronGeometry(0.07, 0), lk.skin, 0, 0.03, 0, a.hand).scale.set(1, 0.9, 1.1);
+    root.add(a.up, a.fore, a.hand);
+    return a;
+  });
+  mergeStatic(root, [upper, pivot, ...arms.flatMap(a => [a.up, a.fore, a.hand])]);
+
+  const sh = new V3(), hd = new V3(), el = new V3(), dir = new V3();
+  // steer: -1..1, lean: 0..1.2 (speed), t: time, win: waving from the podium, a: how far to ease (1 = snap)
+  function pose(steer, lean, t, win, a) {
+    upper.rotation.z = lerp(upper.rotation.z, -steer * 0.12 * lean, a);
+    upper.position.y = 0.92 + Math.sin(t * 2.4) * 0.008;
+    head.rotation.y = lerp(head.rotation.y, win ? Math.sin(t * 1.6) * 0.3 : steer * 0.35, a);
+    head.rotation.x = lerp(head.rotation.x, win ? -0.2 : 0, a);
+    spin.rotation.z = lerp(spin.rotation.z, -steer * 1.2, a);
+    if (sway) {
+      sway.rotation.x = lerp(sway.rotation.x, -0.3 * lean + Math.sin(t * 3.1) * 0.06, a);
+      sway.rotation.z = lerp(sway.rotation.z, -steer * 0.3 * lean + Math.sin(t * 2.3) * 0.05, a);
+    }
+    upper.updateMatrix(); pivot.updateMatrix(); spin.updateMatrix();
+    for (const r of arms) {
+      sh.copy(r.shoulder).applyMatrix4(upper.matrix);
+      if (win && r.s < 0) {
+        hd.set(sh.x - 0.3 + Math.sin(t * 9) * 0.1, sh.y + 0.52, sh.z + 0.12);
+        el.set((sh.x + hd.x) / 2 - 0.14, (sh.y + hd.y) / 2 - 0.04, (sh.z + hd.z) / 2 + 0.03);
+      } else {
+        hd.copy(r.grip).applyMatrix4(spin.matrix).applyMatrix4(pivot.matrix);
+        el.set((sh.x + hd.x) / 2 + r.s * 0.14, (sh.y + hd.y) / 2 - 0.12, (sh.z + hd.z) / 2 - 0.04);
+      }
+      setLimb(r.up, sh, el); setLimb(r.fore, el, hd);
+      r.hand.position.copy(hd);
+      r.hand.quaternion.setFromUnitVectors(UP, dir.subVectors(hd, el).normalize());
+    }
+  }
+  pose(0, 0, 0, false, 1);
+  return { group: root, pose, pivot };
+}
+
+// head-and-shoulders portraits of the drivers for the driver buttons, drawn once at start-up
+const PORTRAITS = (() => {
+  try {
+    const r = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+    r.setPixelRatio(1); r.setSize(96, 96);
+    const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+    sc.add(new THREE.HemisphereLight(0xeaf6ff, 0x806a5a, 0.95));
+    const sun = new THREE.DirectionalLight(0xfff4e0, 0.6); sun.position.set(2, 4, 5); sc.add(sun);
+    cam.position.set(0.5, 2.05, 1.3); cam.lookAt(0, 1.78, -0.3);
+    const urls = ROSTER.map(def => {
+      const d = makeDriver(def);
+      d.pivot.visible = false;
+      sc.add(d.group);
+      r.render(sc, cam);
+      sc.remove(d.group);
+      d.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material !== darkMat) o.material.dispose(); });
+      return r.domElement.toDataURL();
+    });
+    r.dispose(); r.forceContextLoss();
+    return urls;
+  } catch (e) { return []; }
+})();
+// the driver's colour dot in the menus, with their portrait when there is one
+const driverDot = i => `<i class="face" style="background:${hexCss(ROSTER[i].color)}${PORTRAITS[i] ? ` url(${PORTRAITS[i]}) center / cover` : ''}"></i>`;
 
 function makeKartMesh(def) {
   const group = new THREE.Group(), body = new THREE.Group();
   group.rotation.order = 'YXZ';
   group.add(body);
   const paint = lambert({ color: def.color });
-  const helm = lambert({ color: def.helmet });
-  const suit = lambert({ color: def.suit });
   const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
   add(new THREE.BoxGeometry(1.7, 0.45, 2.9), paint, 0, 0.55, 0);
   add(new THREE.BoxGeometry(1.2, 0.35, 0.9), paint, 0, 0.55, 1.75);
   add(new THREE.BoxGeometry(2.1, 0.25, 0.45), darkMat, 0, 0.42, 2.2);
   add(new THREE.BoxGeometry(2.3, 0.3, 1.0), darkMat, 0, 0.45, -0.1);
   add(new THREE.BoxGeometry(1.1, 0.6, 0.35), darkMat, 0, 1.05, -0.8);
-  add(new THREE.BoxGeometry(0.95, 0.65, 0.7), suit, 0, 1.15, -0.35);
-  add(new THREE.SphereGeometry(0.44, 16, 12), helm, 0, 1.78, -0.3);
-  add(new THREE.BoxGeometry(0.62, 0.2, 0.14), darkMat, 0, 1.8, 0.1);
-  add(new THREE.BoxGeometry(0.2, 0.2, 0.2), skinMat, 0.45, 1.15, 0.3);
-  add(new THREE.BoxGeometry(0.2, 0.2, 0.2), skinMat, -0.45, 1.15, 0.3);
-  const wheel = add(new THREE.TorusGeometry(0.26, 0.05, 6, 14), darkMat, 0, 1.25, 0.45);
-  wheel.rotation.x = -0.7;
+  const column = add(new THREE.CylinderGeometry(0.035, 0.035, 0.72, 6), darkMat, 0, 1.0, 0.73); // steering column
+  column.rotation.x = -0.86;
   add(new THREE.BoxGeometry(2.1, 0.1, 0.5), paint, 0, 1.35, -1.5);
   add(new THREE.BoxGeometry(0.1, 0.55, 0.1), darkMat, 0.6, 1.05, -1.45);
   add(new THREE.BoxGeometry(0.1, 0.55, 0.1), darkMat, -0.6, 1.05, -1.45);
@@ -4693,11 +5034,13 @@ function makeKartMesh(def) {
     wheels.push(w);
   }
   mergeStatic(body, wheels); // one mesh per colour instead of ~25 parts; the wheels still turn
+  const driver = makeDriver(def);
+  body.add(driver.group);
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(3, 4).rotateX(-Math.PI / 2), shadowMat);
   shadow.position.y = 0.04;
   group.add(shadow);
   scene.add(group);
-  return { group, body, wheels };
+  return { group, body, wheels, driver };
 }
 
 const CLASSES = {
@@ -4743,7 +5086,7 @@ function nameTag(text, color) {
 
 // spec (online only): one { def, id, name } per grid slot, front row first; id is null for computer rivals
 function buildGrid(spec) {
-  const shared = new Set([darkMat, metalMat, skinMat, shadowMat]);
+  const shared = new Set([darkMat, metalMat, shadowMat]);
   for (const k of karts) {
     scene.remove(k.mesh.group);
     k.mesh.group.traverse(o => {
@@ -5685,6 +6028,7 @@ function updateKartVisual(k, dt) {
 
   const near = k === player || k.pos.distanceToSquared(camera.position) < 90 * 90;
   if (!near) return;
+  if (m.driver) m.driver.pose(k.steerVis, lean, animTime + k.slot * 1.7, k.finished && k.place > 0 && k.place <= 3, 1 - Math.exp(-10 * dt));
   m.group.updateMatrixWorld(true);
   if (k.drift.active) {
     const col = k.drift.charge >= 1.7 ? 0xFF8A1F : k.drift.charge >= 0.8 ? 0x4FC3FF : 0;
@@ -6025,7 +6369,7 @@ const chips = $('#chips');
 ROSTER.forEach((d, i) => {
   const b = document.createElement('button');
   b.className = 'chip'; b.id = 'drv' + i;
-  b.innerHTML = `<i style="background:${hexCss(d.color)}"></i><span>${d.name}<small>${d.tag}</small></span>`;
+  b.innerHTML = `${driverDot(i)}<span>${d.name}<small>${d.tag}</small></span>`;
   b.addEventListener('click', () => { playerDef = i; syncMenu(); buildGrid(); });
   chips.appendChild(b);
 });
@@ -6636,7 +6980,7 @@ function renderLobby() {
 ROSTER.forEach((d, i) => {
   const b = document.createElement('button');
   b.className = 'chip';
-  b.innerHTML = `<i style="background:${hexCss(d.color)}"></i><span>${d.name}<small>${d.tag}</small></span>`;
+  b.innerHTML = `${driverDot(i)}<span>${d.name}<small>${d.tag}</small></span>`;
   b.addEventListener('click', () => {
     if (!net) return;
     if (net.host) hostPick(net.myId, i); else net.t.send({ t: 'pick', def: i });

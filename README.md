@@ -65,6 +65,23 @@ Once you've unlocked every track in a cup, **Grand Prix** on the title screen ra
 
 Each track has its own music and background sounds, generated live with the Web Audio API.
 
+## Drivers
+
+Six drivers, all built in code from low-poly shapes, with hand-painted faces. Every driver handles the same; only the looks differ.
+
+![The six drivers: Omo Turbo, Odogwu, Smallie, Sisi Pepper, Madam Cruise and Kiki Vroom](screenshots/07-drivers.jpg)
+
+| Driver | Kart | Style |
+|--------|------|-------|
+| Omo Turbo | Yellow | The speed demon: short textured hair, electric-blue and white track jacket |
+| Odogwu | Orange | The boss of the track: short twists, orange and charcoal racing jacket |
+| Smallie | Green | The playful underdog: a round afro, lime-green oversized hoodie and colourful sneakers |
+| Sisi Pepper | Red | The fiery competitor: braids in a high ponytail, red, black and white racing jacket |
+| Madam Cruise | Purple | The cool trickster: shoulder-length curls with sunglasses pushed up, purple and lavender jacket |
+| Kiki Vroom | Pink | The speed queen: long copper braids with cream beads, forest-green sweatshirt with copper trim |
+
+Drivers turn the steering wheel and look into corners, ponytails and braids swing with the speed, and the top three wave when they finish.
+
 ## Controls
 
 | Key | Action |
