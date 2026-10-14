@@ -251,7 +251,7 @@
   .cups button .lk { display: block; font-size: 9px; letter-spacing: 0.12em; color: var(--sun); }
   .cup-tag { margin: -2px 0 0; font-size: 12px; color: var(--muted); }
   .trk { display: flex; flex-direction: column; gap: 1px; padding: 0 0 10px; overflow: hidden; text-align: left; }
-  .trk .band { display: block; height: 30px; margin-bottom: 6px; position: relative; }
+  .trk .band { display: block; height: 62px; margin-bottom: 6px; position: relative; }
   .trk .band::after {
     content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
     background: conic-gradient(#fff 25%, #1B1330 0 50%, #fff 0 75%, #1B1330 0) 0 0 / 6px 6px;
@@ -491,7 +491,7 @@
     .eyebrow { font-size: 10px; }
     .logo { font-size: 34px; -webkit-text-stroke-width: 2px; text-shadow: 0 3px 0 var(--flag); }
     .trk { padding-bottom: 6px; }
-    .trk .band { height: 16px; margin-bottom: 3px; }
+    .trk .band { height: 30px; margin-bottom: 3px; }
     .trk .tn { font-size: 9px; }
     .trk b { font-size: 15px; }
     .trk small { font-size: 10px; }
@@ -6835,7 +6835,9 @@ function buildTrackPicker(tabsEl, cardsEl, onTab, onPick) {
   LEVELS.forEach((lv, i) => {
     const b = document.createElement('button');
     b.className = 'trk';
-    b.innerHTML = `<span class="band" style="background:${lv.band}"></span><span class="tn">${raceLabel(i)}</span><b>${lv.name}</b><small></small>`;
+    // the track's picture (tracks/<name>.jpg), over its colour stripe while it loads
+    const pic = `tracks/${lv.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.jpg`;
+    b.innerHTML = `<span class="band" style="background:url(${pic}) center / cover, ${lv.band}"></span><span class="tn">${raceLabel(i)}</span><b>${lv.name}</b><small></small>`;
     b.addEventListener('click', () => onPick(i));
     cardsEl.appendChild(b);
   });
