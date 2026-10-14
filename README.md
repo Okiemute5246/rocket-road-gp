@@ -82,6 +82,10 @@ Six drivers, all built in code from low-poly shapes, with hand-painted faces. Ev
 
 Drivers turn the steering wheel and look into corners, ponytails and braids swing with the speed, and the top three wave when they finish.
 
+**Start race** and **Grand Prix** open the driver select screen. It's a carousel of the six drivers standing on their podiums, and each driver does a short dance when they arrive in the middle. Use ◀ ▶ (or the arrow keys, or swipe on a phone) to look through them, then **LET'S RACE!** (or Enter) to start. **Back** (or Esc) returns to the title screen. Your driver is remembered in your browser.
+
+![The driver select screen, with Sisi Pepper finishing her dance](screenshots/08-driver-select.jpg)
+
 ## Controls
 
 | Key | Action |

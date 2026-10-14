@@ -151,6 +151,54 @@
     box-sizing: border-box;
   }
   .card.wide { width: min(960px, 100%); }
+  /* driver select: the 3D carousel fills the screen, the controls sit round the edges */
+  #select {
+    position: fixed; inset: 0; box-sizing: border-box;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+    touch-action: pan-y; -webkit-user-select: none; user-select: none;
+  }
+  #select[hidden] { display: none; }
+  .sel-top { display: flex; align-items: center; gap: 14px; }
+  .sel-title {
+    font-family: var(--display); font-size: clamp(22px, 3.4vw, 36px); color: var(--paper);
+    -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; text-shadow: 0 4px 0 var(--flag);
+  }
+  .sel-arrow {
+    position: absolute; top: 46%; transform: translateY(-50%);
+    width: 58px; height: 58px; border-radius: 50%;
+    font-family: var(--ui); font-size: 40px; font-weight: 700; line-height: 1; padding: 0 0 6px;
+    color: var(--ink); background: var(--sun); border: 3px solid var(--paper); box-shadow: 0 4px 0 var(--flag);
+    cursor: pointer;
+  }
+  .sel-arrow:active { transform: translateY(calc(-50% + 3px)); box-shadow: 0 1px 0 var(--flag); }
+  .sel-arrow.prev { left: calc(16px + env(safe-area-inset-left, 0px)); }
+  .sel-arrow.next { right: calc(16px + env(safe-area-inset-right, 0px)); }
+  .sel-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .sel-info {
+    background: rgba(27, 19, 48, 0.85); border: 3px solid var(--paper); border-radius: 10px;
+    padding: 12px 16px; width: min(380px, 44vw); box-sizing: border-box;
+  }
+  .sel-bar { height: 6px; border-radius: 3px; margin-bottom: 8px; }
+  #selName { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(28px, 4vw, 44px); line-height: 1; color: var(--paper); }
+  .sel-tag { margin-top: 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+  .sel-bio { margin: 6px 0 0; font-size: 14px; line-height: 1.35; color: var(--muted); }
+  .sel-dots { display: flex; gap: 6px; margin-top: 10px; }
+  .sel-dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255, 255, 255, 0.25); }
+  .sel-dots i.on { background: var(--sun); }
+  #selGo { font-size: clamp(24px, 3.4vw, 38px); white-space: nowrap; }
+  @media (max-height: 500px) {
+    .sel-title { font-size: 20px; }
+    .sel-arrow { width: 44px; height: 44px; font-size: 30px; }
+    .sel-info { padding: 8px 12px; width: min(300px, 36vw); }
+    #selName { font-size: 26px; }
+    .sel-bio { display: none; }
+    .sel-dots { margin-top: 6px; }
+    #selGo { font-size: 22px; padding: 8px 14px; }
+  }
+  /* the current driver on the title screen; it opens the driver select */
+  .drv-pick { width: 100%; }
+  .drv-pick .drv-change { margin-left: auto; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--sun); }
   .cols { display: grid; grid-template-columns: 1fr; gap: 18px; }
   .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   @media (min-width: 880px) { .cols { grid-template-columns: 1.05fr 1fr; gap: 28px; } }
@@ -411,6 +459,7 @@
     #audioCtl button { height: 30px; padding: 0 9px 0 7px; font-size: 11px; border-width: 2px; }
     #audioCtl button svg { width: 16px; height: 16px; }
     #hud[hidden] ~ #audioCtl { top: auto; bottom: calc(5px + env(safe-area-inset-bottom, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); }
+    body.selecting #hud[hidden] ~ #audioCtl { top: calc(14px + env(safe-area-inset-top, 0px)); bottom: auto; right: calc(16px + env(safe-area-inset-right, 0px)); }
     .hud-br { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
     .pos #posNum, body.touch .pos #posNum { font-size: 64px; -webkit-text-stroke-width: 3px; text-shadow: 0 4px 0 var(--ink); }
     .pos #posSuf, body.touch .pos #posSuf { font-size: 24px; margin-top: 6px; }
@@ -559,7 +608,7 @@
       <div class="col">
         <div class="group">
           <div class="lbl">Driver</div>
-          <div class="chips" id="chips"></div>
+          <button class="chip drv-pick" id="drvPick"></button>
         </div>
         <div class="group">
           <div class="lbl">Engine class</div>
@@ -583,6 +632,25 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="select" hidden>
+  <div class="sel-top">
+    <button class="btn" id="selBack">&larr; Back</button>
+    <div class="sel-title">Choose your driver</div>
+  </div>
+  <button class="sel-arrow prev" id="selPrev" aria-label="Previous driver">&lsaquo;</button>
+  <button class="sel-arrow next" id="selNext" aria-label="Next driver">&rsaquo;</button>
+  <div class="sel-bottom">
+    <div class="sel-info" aria-live="polite">
+      <div class="sel-bar" id="selBar"></div>
+      <h2 id="selName"></h2>
+      <div class="sel-tag" id="selTag"></div>
+      <p class="sel-bio" id="selBio"></p>
+      <div class="sel-dots" id="selDots"></div>
+    </div>
+    <button class="go" id="selGo">LET'S RACE!</button>
   </div>
 </div>
 
@@ -4641,31 +4709,37 @@ function toggleSfx() {
 // ------------------------------------------------------------------ karts
 // The six drivers. Each keeps one of the original kart colours; the look describes the driver.
 const ROSTER = [
-  { id: 'omo-turbo', name: 'Omo Turbo', tag: 'Speed demon', color: 0xFFC21F, look: {
+  { id: 'omo-turbo', name: 'Omo Turbo', tag: 'Speed demon', color: 0xFFC21F, bio: "Lives for the long straights. If there's a gap, he's already through it.",
+    look: {
     skin: 0x8a5a3b, hair: 0x17110e, hairStyle: 'short', top: 0x1E6BFF, legs: 0x262a33, shoe: 0xF4F6FF, sole: 0x1E6BFF,
     deco: { stripes: 0xF4F6FF, zip: 0xF4F6FF, collar: 0xF4F6FF, hem: 0xF4F6FF, cuff: 0xF4F6FF },
     face: { iris: '#5a3216', brows: 'confident', mouth: 'grin' } } },
-  { id: 'odogwu', name: 'Odogwu', tag: 'Boss of the track', color: 0xFF8A1F, look: {
+  { id: 'odogwu', name: 'Odogwu', tag: 'Boss of the track', color: 0xFF8A1F, bio: "Calm, cool and in charge. He races like he owns the road.",
+    look: {
     skin: 0x4e2f1f, hair: 0x110b09, hairStyle: 'twists', top: 0xFF7A1A, legs: 0x2f3138, shoe: 0x2f3138, sole: 0xFF7A1A, build: 1.12,
     headScale: [1.02, 1.04, 0.97],
     deco: { band: 0x2f3138, zip: 0x2f3138, collar: 0x2f3138, hem: 0x2f3138, cuff: 0x2f3138 },
     face: { iris: '#3d2412', brows: 'strong', mouth: 'smirk' } } },
-  { id: 'smallie', name: 'Smallie', tag: 'Playful underdog', color: 0x2EC27E, look: {
+  { id: 'smallie', name: 'Smallie', tag: 'Playful underdog', color: 0x2EC27E, bio: "Small kart, big heart. Always laughing, never counted out.",
+    look: {
     skin: 0x7a4a2e, hair: 0x1a120d, hairStyle: 'afro', top: 0x9BE22D, legs: 0x2a2a35, shoe: 0xFF4FA3, sole: 0x2EC2E0,
     oversize: true, scale: 0.88, headScale: [1.08, 1.12, 1.03],
     deco: { hood: true, strings: 0xF5EBC8, collar: 0xF5EBC8, hem: 0xF5EBC8, cuff: 0xF5EBC8 },
     face: { iris: '#5a3216', brows: 'raised', mouth: 'open', wink: true, blush: true } } },
-  { id: 'sisi-pepper', name: 'Sisi Pepper', tag: 'Fiery competitor', color: 0xE8363C, look: {
+  { id: 'sisi-pepper', name: 'Sisi Pepper', tag: 'Fiery competitor', color: 0xE8363C, bio: "Attacks every corner and never, ever backs down.",
+    look: {
     skin: 0x8d5b3c, hair: 0x161010, hairStyle: 'ponytail', top: 0xE02A2A, legs: 0x18161c, shoe: 0xF4F4F4, sole: 0xE02A2A, hightop: true,
     build: 0.92, headScale: [0.97, 1.04, 0.95],
     deco: { stripes: 0xF4F4F4, band: 0x18161c, collar: 0x18161c, hem: 0x18161c, cuff: 0xF4F4F4, tie: 0xE02A2A },
     face: { iris: '#4a2a14', brows: 'fierce', mouth: 'smile', lashes: true, lip: '#8a3a3a' } } },
-  { id: 'madam-cruise', name: 'Madam Cruise', tag: 'Cool trickster', color: 0x7B4DFF, look: {
+  { id: 'madam-cruise', name: 'Madam Cruise', tag: 'Cool trickster', color: 0x7B4DFF, bio: "Never in a hurry, somehow always in front. Watch out for her tricks.",
+    look: {
     skin: 0x6e4430, hair: 0x1c130f, hairStyle: 'curls', top: 0x7B4DFF, legs: 0x1f1a2e, shoe: 0xC9B5FF, sole: 0xFFC21F,
     oversize: true, build: 0.95, headScale: [0.97, 1.04, 0.95],
     deco: { zip: 0xC9B5FF, collar: 0xC9B5FF, hem: 0xC9B5FF, cuff: 0xC9B5FF, shades: 0x2a1f45 },
     face: { iris: '#4a2a14', brows: 'arched', mouth: 'smirk', lashes: true, cool: true, lip: '#7a3a4a' } } },
-  { id: 'kiki-vroom', name: 'Kiki Vroom', tag: 'Speed queen', color: 0xFF6FB5, look: {
+  { id: 'kiki-vroom', name: 'Kiki Vroom', tag: 'Speed queen', color: 0xFF6FB5, bio: "Fast hands, faster feet. She makes winning look like a party.",
+    look: {
     skin: 0x7d4f33, hair: 0xD0612A, hairStyle: 'braids', top: 0x1F6B45, legs: 0x1d1d24, shoe: 0xB8652F, sole: 0xF2E6C8, hightop: true,
     oversize: true, build: 0.92, headScale: [0.97, 1.04, 0.95],
     deco: { band: 0xC8743A, collar: 0xF2E6C8, hem: 0xC8743A, cuff: 0xF2E6C8, bead: 0xF2E6C8 },
@@ -4786,7 +4860,8 @@ function faceTexture(def) {
   return t;
 }
 
-function makeDriver(def) {
+// stand: build a standing driver for the driver select screen, with legs and arms posed by rig()
+function makeDriver(def, stand = false) {
   const lk = def.look, d = lk.deco, big = lk.oversize ? 0.035 : 0;
   const mats = new Map();
   const mat = c => { if (!mats.has(c)) mats.set(c, lambert({ color: c })); return mats.get(c); };
@@ -4795,7 +4870,8 @@ function makeDriver(def) {
     m.position.set(x, y, z); parent.add(m); return m;
   };
   const limbGeo = r => facet(new THREE.CylinderGeometry(r, r * 0.9, 1, 6));
-  const root = new THREE.Group(), upper = new THREE.Group(), head = new THREE.Group();
+  const root = new THREE.Group(), upper = new THREE.Group(), chest = new THREE.Group(), head = new THREE.Group();
+  const HIP = 0.66; // standing hip height
 
   // ---- head: faceted skull, painted face, hair
   head.add(new THREE.Mesh(facet(new THREE.SphereGeometry(HEAD_R, 12, 10)), mat(lk.skin)));
@@ -4890,42 +4966,61 @@ function makeDriver(def) {
   // ---- body: an eight-sided jacket with flat faces front and back, so stripes sit flush
   const TH = 0.62, rB = 0.33 * (lk.build || 1) + big, rT = 0.28 * (lk.build || 1) + big;
   const rAt = y => rB + (rT - rB) * y / TH;
-  const hoop = (rt, rb, h, y, color) => { const m = put(new THREE.CylinderGeometry(rt, rb, h, 8, 1, false, Math.PI / 8), color, 0, y, 0, upper); m.scale.z = 0.72; return m; };
+  const hoop = (rt, rb, h, y, color) => { const m = put(new THREE.CylinderGeometry(rt, rb, h, 8, 1, false, Math.PI / 8), color, 0, y, 0, chest); m.scale.z = 0.72; return m; };
   const ring = (y, h, color) => hoop(rAt(y) + 0.014, rAt(y) + 0.014, h, y, color);
   hoop(rT, rB, TH, TH / 2, lk.top);
   if (d.hem) ring(0.05, 0.1, d.hem);
   if (d.band) ring(0.38, 0.1, d.band);
   if (d.stripes) for (const s of [-1, 1]) for (const f of [-1, 1]) {
-    put(new THREE.BoxGeometry(0.045, TH - 0.06, 0.02), d.stripes, s * 0.065, TH / 2, f * (rAt(TH / 2) * Math.cos(Math.PI / 8) * 0.72 + 0.01), upper);
+    put(new THREE.BoxGeometry(0.045, TH - 0.06, 0.02), d.stripes, s * 0.065, TH / 2, f * (rAt(TH / 2) * Math.cos(Math.PI / 8) * 0.72 + 0.01), chest);
   }
-  if (d.zip) put(new THREE.BoxGeometry(0.025, TH - 0.08, 0.02), d.zip, 0, TH / 2, rAt(TH / 2) * Math.cos(Math.PI / 8) * 0.72 + 0.01, upper);
-  put(new THREE.CylinderGeometry(0.15 + big, 0.2 + big, 0.09, 8, 1, false, Math.PI / 8), d.collar || lk.top, 0, TH + 0.01, 0, upper).scale.z = 0.8;
-  put(new THREE.CylinderGeometry(0.07, 0.08, 0.18, 6), lk.skin, 0, TH + 0.09, 0.02, upper);
+  if (d.zip) put(new THREE.BoxGeometry(0.025, TH - 0.08, 0.02), d.zip, 0, TH / 2, rAt(TH / 2) * Math.cos(Math.PI / 8) * 0.72 + 0.01, chest);
+  put(new THREE.CylinderGeometry(0.15 + big, 0.2 + big, 0.09, 8, 1, false, Math.PI / 8), d.collar || lk.top, 0, TH + 0.01, 0, chest).scale.z = 0.8;
+  put(new THREE.CylinderGeometry(0.07, 0.08, 0.18, 6), lk.skin, 0, TH + 0.09, 0.02, chest);
   const shX = rT * Math.cos(Math.PI / 8) + 0.03;
-  for (const s of [-1, 1]) put(new THREE.IcosahedronGeometry(0.1 + big, 0), lk.top, s * shX, TH - 0.06, 0, upper);
-  if (d.hood) put(new THREE.SphereGeometry(0.2 + big, 8, 5), lk.top, 0, TH - 0.03, -0.18, upper).scale.set(1.15, 0.7, 0.75);
-  if (d.strings) for (const s of [-1, 1]) put(new THREE.BoxGeometry(0.022, 0.17, 0.022), d.strings, s * 0.05, TH - 0.14, rAt(TH - 0.14) * Math.cos(Math.PI / 8) * 0.72 + 0.02, upper);
-  upper.add(head);
-  mergeStatic(upper, [head]);
-  upper.position.set(0, 0.92, -0.42);
-  upper.rotation.x = 0.1; // leaning in towards the wheel
-  if (lk.scale) upper.scale.setScalar(lk.scale);
+  for (const s of [-1, 1]) put(new THREE.IcosahedronGeometry(0.1 + big, 0), lk.top, s * shX, TH - 0.06, 0, chest);
+  if (d.hood) put(new THREE.SphereGeometry(0.2 + big, 8, 5), lk.top, 0, TH - 0.03, -0.18, chest).scale.set(1.15, 0.7, 0.75);
+  if (d.strings) for (const s of [-1, 1]) put(new THREE.BoxGeometry(0.022, 0.17, 0.022), d.strings, s * 0.05, TH - 0.14, rAt(TH - 0.14) * Math.cos(Math.PI / 8) * 0.72 + 0.02, chest);
+  chest.add(head);
+  mergeStatic(chest, [head]);
+  upper.add(chest);
+  if (stand) {
+    // a pelvis below the jacket, where the legs join
+    put(new THREE.CylinderGeometry(rB * 0.92, rB * 0.8, 0.18, 8, 1, false, Math.PI / 8), lk.legs, 0, -0.04, 0, upper).scale.z = 0.72;
+    upper.position.set(0, HIP, 0);
+    if (lk.scale) root.scale.setScalar(lk.scale);
+  } else {
+    upper.position.set(0, 0.92, -0.42);
+    upper.rotation.x = 0.1; // leaning in towards the wheel
+    if (lk.scale) upper.scale.setScalar(lk.scale);
+  }
   root.add(upper);
 
-  // ---- legs and sneakers
-  const legs = [];
-  for (const s of [-1, 1]) {
+  // ---- legs and sneakers: fixed in the kart, posed by rig() when standing
+  const shoe = parent => {
+    const shoeH = lk.hightop ? 0.24 : 0.15;
+    put(new THREE.BoxGeometry(0.17, shoeH, 0.3), lk.shoe, 0, -0.05 + shoeH / 2, 0.05, parent);
+    put(new THREE.BoxGeometry(0.19, 0.05, 0.33), lk.sole, 0, -0.075, 0.06, parent);
+  };
+  const feet = stand ? [-1, 1].map(s => {
+    const f = { s, thigh: new THREE.Mesh(limbGeo(0.1), mat(lk.legs)), shin: new THREE.Mesh(limbGeo(0.085), mat(lk.legs)), foot: new THREE.Group() };
+    shoe(f.foot);
+    mergeStatic(f.foot, []);
+    root.add(f.thigh, f.shin, f.foot);
+    return f;
+  }) : [];
+  for (const s of stand ? [] : [-1, 1]) {
     const hip = new V3(s * 0.15, 0.95, -0.36), knee = new V3(s * 0.19, 1.07, 0.3), ankle = new V3(s * 0.2, 0.9, 0.72);
     for (const [a, b, r] of [[hip, knee, 0.1], [knee, ankle, 0.085]]) {
-      const m = new THREE.Mesh(limbGeo(r), mat(lk.legs)); setLimb(m, a, b); root.add(m); legs.push(m);
+      const m = new THREE.Mesh(limbGeo(r), mat(lk.legs)); setLimb(m, a, b); root.add(m);
     }
     const shoeH = lk.hightop ? 0.24 : 0.15;
     put(new THREE.BoxGeometry(0.17, shoeH, 0.3), lk.shoe, s * 0.2, 0.795 + shoeH / 2, 0.84, root);
     put(new THREE.BoxGeometry(0.19, 0.05, 0.33), lk.sole, s * 0.2, 0.79, 0.85, root);
   }
 
-  // ---- steering wheel, which turns with the steering
-  const pivot = new THREE.Group(), spin = new THREE.Group();
+  // ---- steering wheel, which turns with the steering (not when standing)
+  const pivot = stand ? null : new THREE.Group(), spin = new THREE.Group();
   spin.add(new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.045, 6, 14), darkMat));
   for (const r of [0, Math.PI * 2 / 3, Math.PI * 4 / 3]) {
     const sp = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.03), darkMat);
@@ -4933,8 +5028,10 @@ function makeDriver(def) {
   }
   spin.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 8).rotateX(Math.PI / 2), mat(def.color)));
   mergeStatic(spin, []);
-  pivot.position.set(0, 1.25, 0.45); pivot.rotation.x = -0.7;
-  pivot.add(spin); root.add(pivot);
+  if (pivot) {
+    pivot.position.set(0, 1.25, 0.45); pivot.rotation.x = -0.7;
+    pivot.add(spin); root.add(pivot);
+  }
 
   // ---- arms: shoulder to hand, re-aimed every frame
   const arms = [-1, 1].map(s => {
@@ -4947,7 +5044,7 @@ function makeDriver(def) {
     root.add(a.up, a.fore, a.hand);
     return a;
   });
-  mergeStatic(root, [upper, pivot, ...arms.flatMap(a => [a.up, a.fore, a.hand])]);
+  mergeStatic(root, [upper, ...(pivot ? [pivot] : []), ...arms.flatMap(a => [a.up, a.fore, a.hand]), ...feet.flatMap(f => [f.thigh, f.shin, f.foot])]);
 
   const sh = new V3(), hd = new V3(), el = new V3(), dir = new V3();
   // steer: -1..1, lean: 0..1.2 (speed), t: time, win: waving from the podium, a: how far to ease (1 = snap)
@@ -4976,9 +5073,127 @@ function makeDriver(def) {
       r.hand.quaternion.setFromUnitVectors(UP, dir.subVectors(hd, el).normalize());
     }
   }
-  pose(0, 0, 0, false, 1);
-  return { group: root, pose, pivot };
+
+  // ---- standing poses. A pose P (see POSE_KEYS) moves the pelvis, chest and head, and puts the
+  // hands (in the chest's space) and feet (on the ground) where it says; arms and legs keep their
+  // length and bend at the elbows and knees to reach.
+  const M = new THREE.Matrix4(), mid = new V3(), end = new V3(), bend = new V3();
+  const KNEE = new V3(0, 0, 1), ELBOW = [new V3(-0.8, -0.6, -0.3), new V3(0.8, -0.6, -0.3)];
+  function reach(a, target, l1, l2, bendDir, m1, m2) {
+    dir.subVectors(target, a);
+    const d = clamp(dir.length(), 0.01, l1 + l2 - 0.002);
+    dir.normalize();
+    const x = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(l1 * l1 - x * x, 0));
+    bend.copy(bendDir).addScaledVector(dir, -bendDir.dot(dir));
+    if (bend.lengthSq() < 1e-6) bend.set(0, 0, 1);
+    bend.normalize();
+    mid.copy(a).addScaledVector(dir, x).addScaledVector(bend, h);
+    end.copy(a).addScaledVector(dir, d);
+    setLimb(m1, a, mid); setLimb(m2, mid, end);
+  }
+  function rig(P) {
+    upper.position.set(P.px, HIP + P.py, P.pz); upper.rotation.set(P.prx, P.pry, P.prz);
+    chest.position.set(0, P.cpy, P.cpz); chest.rotation.set(P.crx, P.cry, P.crz);
+    head.rotation.set(P.hrx, P.hry, P.hrz);
+    if (sway) sway.rotation.set(-0.15 - P.crx * 0.5, 0, -(P.crz + P.prz) * 1.4 - P.hrz * 0.4);
+    upper.updateMatrix(); chest.updateMatrix();
+    M.multiplyMatrices(upper.matrix, chest.matrix);
+    for (const r of arms) {
+      const L = r.s > 0;
+      sh.copy(r.shoulder).applyMatrix4(M);
+      hd.set(L ? P.lhx : P.rhx, L ? P.lhy : P.rhy, L ? P.lhz : P.rhz).applyMatrix4(M);
+      reach(sh, hd, 0.3, 0.28, ELBOW[L ? 1 : 0], r.up, r.fore);
+      r.hand.position.copy(end);
+      r.hand.quaternion.setFromUnitVectors(UP, el.subVectors(end, mid).normalize());
+    }
+    for (const f of feet) {
+      const L = f.s > 0;
+      sh.set(f.s * 0.13, -0.04, 0).applyMatrix4(upper.matrix);
+      hd.set(L ? P.lfx : P.rfx, Math.max(0.1, L ? P.lfy : P.rfy), L ? P.lfz : P.rfz);
+      reach(sh, hd, 0.3, 0.3, KNEE, f.thigh, f.shin);
+      f.foot.position.copy(end);
+      f.foot.rotation.set(-(L ? P.lfp : P.rfp), 0, 0);
+    }
+  }
+  if (stand) rig(idlePose(0, 0));
+  else pose(0, 0, 0, false, 1);
+  return { group: root, pose, pivot, rig };
 }
+
+// ------------------------------------------------------------------ driver poses and dances
+// Standing poses for the driver select screen. A pose moves the pelvis (p*), chest (c*) and head (h*),
+// and places the hands (lh*, rh*: in the chest's space, left is +x) and feet (lf*, rf*: on the
+// ground, y 0.1 is flat; *p tips the toes up). Dances are short, stylised routines laid over the idle.
+const sstep = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+const ramp = (t, a, b) => sstep((t - a) / (b - a)); // 0 before a, easing to 1 at b
+const bump = (t, a, b) => t <= a || t >= b ? 0 : Math.sin(Math.PI * (t - a) / (b - a)); // up and back down between a and b
+function idlePose(t, ph) {
+  const b = Math.sin(t * 2.2 + ph), w = Math.sin(t * 0.7 + ph);
+  return {
+    px: w * 0.012, py: -0.01 + b * 0.004, pz: 0, prx: 0, pry: 0, prz: w * 0.015,
+    cpy: b * 0.006, cpz: 0, crx: 0, cry: 0, crz: -w * 0.01,
+    hrx: 0, hry: Math.sin(t * 0.45 + ph) * 0.12, hrz: Math.sin(t * 0.6 + ph) * 0.04,
+    lhx: 0.36, lhy: 0.08 + b * 0.008, lhz: 0.07, rhx: -0.36, rhy: 0.08 + b * 0.008, rhz: 0.07,
+    lfx: 0.15, lfy: 0.1, lfz: 0.02, lfp: 0, rfx: -0.15, rfy: 0.1, rfz: 0.02, rfp: 0,
+  };
+}
+// move pose A towards the values in B by w
+function over(A, B, w) { if (w > 0) for (const k in B) A[k] += (B[k] - A[k]) * w; return A; }
+const DANCES = {
+  // shoulder bounce, two quick foot taps, then points ahead with a hand on the hip
+  'omo-turbo': { len: 2.5, at(t) {
+    const P = idlePose(0, 0), b = Math.abs(Math.sin(t * Math.PI * 4.4)), sw = Math.sin(t * Math.PI * 2.2);
+    over(P, { cpy: 0.04 * b, py: -0.035 * b, crz: 0.07 * sw, hrz: -0.06 * sw,
+      lhx: 0.3, lhy: 0.22 + 0.04 * b, lhz: 0.2, rhx: -0.3, rhy: 0.22 + 0.04 * b, rhz: 0.2 }, ramp(t, 0, 0.15) * (1 - ramp(t, 1.5, 1.75)));
+    const tap = t > 1.15 && t < 1.65 ? Math.max(0, Math.sin((t - 1.15) * Math.PI * 8)) : 0;
+    P.rfz += 0.06 * bump(t, 1.05, 1.75); P.rfy += 0.08 * tap; P.rfp += 0.45 * tap;
+    return over(P, { rhx: -0.12, rhy: 0.5, rhz: 0.42, lhx: 0.33, lhy: 0.02, lhz: 0, cry: -0.18, hry: 0.2, hrz: -0.1, hrx: -0.05, px: 0.02 }, ramp(t, 1.65, 1.9));
+  } },
+  // a slow shoulder groove, a chest pop, and arms folded to finish
+  'odogwu': { len: 2.5, at(t) {
+    const P = idlePose(0, 0), s = Math.sin(t * Math.PI * 4.8);
+    over(P, { cry: 0.2 * Math.sin(t * Math.PI * 2.4), crz: 0.06 * s, cpy: 0.025 * Math.abs(s), py: -0.03,
+      lhx: 0.32, lhy: 0.14 + 0.04 * s, lhz: 0.16, rhx: -0.32, rhy: 0.14 - 0.04 * s, rhz: 0.16 }, ramp(t, 0, 0.15) * (1 - ramp(t, 1.0, 1.2)));
+    over(P, { cpz: 0.09, crx: -0.1, cpy: 0.03, lhy: 0.12, lhz: -0.05, rhy: 0.12, rhz: -0.05 }, bump(t, 1.05, 1.45));
+    return over(P, { rhx: 0.2, rhy: 0.32, rhz: 0.28, lhx: -0.2, lhy: 0.28, lhz: 0.34, hrx: -0.12, hry: 0, cry: 0, crz: 0, lfx: 0.2, rfx: -0.2 }, ramp(t, 1.4, 1.7));
+  } },
+  // a side-to-side shuffle, then a little hop with both arms up
+  'smallie': { len: 2.4, at(t) {
+    const P = idlePose(0, 0), ph = t * Math.PI * 2.8, s = Math.sin(ph);
+    over(P, { px: 0.1 * s, prz: -0.06 * s, crz: 0.08 * s, hrz: 0.14 * s,
+      lfx: 0.15 + 0.1 * s, rfx: -0.15 + 0.1 * s, lfy: 0.1 + 0.05 * Math.max(0, Math.sin(ph * 2)), rfy: 0.1 + 0.05 * Math.max(0, -Math.sin(ph * 2)),
+      lhx: 0.34, lhy: 0.12 + 0.12 * Math.max(0, s), lhz: 0.14, rhx: -0.34, rhy: 0.12 + 0.12 * Math.max(0, -s), rhz: 0.14 }, ramp(t, 0, 0.12) * (1 - ramp(t, 1.25, 1.4)));
+    const h = 0.2 * bump(t, 1.55, 1.95), crouch = 0.07 * (bump(t, 1.35, 1.55) + bump(t, 1.95, 2.15));
+    P.py += h - crouch; P.lfy += h; P.rfy += h;
+    return over(P, { lhx: 0.55, lhy: 0.8, lhz: 0.18, rhx: -0.55, rhy: 0.8, rhz: 0.18, hrx: -0.12 }, bump(t, 1.45, 2.1));
+  } },
+  // a quick shoulder-and-hip groove, then a fist in the air
+  'sisi-pepper': { len: 2.5, at(t) {
+    const P = idlePose(0, 0), ph = t * Math.PI * 4, s = Math.sin(ph);
+    over(P, { px: 0.05 * s, prz: 0.1 * s, crz: -0.13 * s, cry: 0.1 * Math.sin(ph / 2), cpy: 0.02 * Math.abs(s), py: -0.03, hrz: 0.08 * s,
+      lfx: 0.18, rfx: -0.18, lhx: 0.27, lhy: 0.3 + 0.08 * s, lhz: 0.22, rhx: -0.27, rhy: 0.3 - 0.08 * s, rhz: 0.22 }, ramp(t, 0, 0.12) * (1 - ramp(t, 1.5, 1.7)));
+    return over(P, { lhx: 0.42, lhy: 0.98, lhz: 0.2, rhx: -0.33, rhy: 0.02, rhz: 0, hrz: 0.12, hry: 0.22, cry: -0.18, px: 0.03, prz: 0.04, lfx: 0.19, rfx: -0.17 }, ramp(t, 1.55, 1.8));
+  } },
+  // an easy two-step, a tilt of the head, and a little wave by her face
+  'madam-cruise': { len: 2.5, at(t) {
+    const P = idlePose(0, 0), ph = t * Math.PI * 1.8, s = Math.sin(ph), c = Math.cos(ph);
+    over(P, { px: 0.08 * s, prz: 0.05 * s, crz: -0.05 * s, hrz: 0.08 * s,
+      lfy: 0.1 + 0.05 * Math.max(0, c), rfy: 0.1 + 0.05 * Math.max(0, -c), lfp: 0.2 * Math.max(0, c), rfp: 0.2 * Math.max(0, -c),
+      lhx: 0.34, lhy: 0.12 + 0.06 * Math.max(0, s), lhz: 0.16, rhx: -0.34, rhy: 0.12 + 0.06 * Math.max(0, -s), rhz: 0.16 }, ramp(t, 0, 0.15) * (1 - ramp(t, 1.3, 1.5)));
+    over(P, { hrz: 0.28, hry: 0.15 }, ramp(t, 1.1, 1.4));
+    return over(P, { rhx: -0.17 + 0.05 * Math.sin(t * 16), rhy: 0.68, rhz: 0.3, lhx: 0.33, lhy: 0.02, lhz: 0, cry: 0.12, px: 0.03, prz: -0.04 }, ramp(t, 1.4, 1.65));
+  } },
+  // quick footwork with swinging arms, then a hop into a cheer
+  'kiki-vroom': { len: 2.4, at(t) {
+    const P = idlePose(0, 0), ph = t * Math.PI * 6, s = Math.sin(ph);
+    over(P, { lfy: 0.1 + 0.07 * Math.max(0, s), rfy: 0.1 + 0.07 * Math.max(0, -s), lfz: 0.02 + 0.07 * s, rfz: 0.02 - 0.07 * s,
+      lfp: 0.3 * Math.max(0, s), rfp: 0.3 * Math.max(0, -s), cry: 0.12 * s, cpy: 0.02 * Math.abs(Math.sin(ph * 2)), py: -0.035,
+      lhx: 0.33, lhy: 0.18 + 0.06 * Math.abs(s), lhz: 0.08 - 0.2 * s, rhx: -0.33, rhy: 0.18 + 0.06 * Math.abs(s), rhz: 0.08 + 0.2 * s }, ramp(t, 0, 0.1) * (1 - ramp(t, 1.4, 1.55)));
+    const h = 0.12 * bump(t, 1.55, 1.85);
+    P.py += h; P.lfy += h; P.rfy += h;
+    return over(P, { lhx: 0.6, lhy: 0.85, lhz: 0.15, rhx: -0.6, rhy: 0.85, rhz: 0.15, hrx: -0.15, cpy: 0.02 }, ramp(t, 1.45, 1.65));
+  } },
+};
 
 // head-and-shoulders portraits of the drivers for the driver buttons, drawn once at start-up
 const PORTRAITS = (() => {
@@ -5663,7 +5878,15 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyR' && state === 'race' && !player.finished) respawn(player);
   if (e.code === 'KeyM') toggleSfx();
   if (e.code === 'KeyN') toggleMusic();
-  if (e.code === 'Enter' && state === 'title' && !net && !$('#title').hidden && document.activeElement === document.body) startRace();
+  if (state === 'select') {
+    const onOther = document.activeElement !== $('#selGo') && $('#select').contains(document.activeElement);
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') selMove(-1);
+    else if (e.code === 'ArrowRight' || e.code === 'KeyD') selMove(1);
+    else if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !onOther) { e.preventDefault(); selectGo(); }
+    else if (e.code === 'Escape' || e.code === 'Backspace') selectBack();
+    return;
+  }
+  if (e.code === 'Enter' && state === 'title' && !net && !$('#title').hidden && document.activeElement === document.body) openSelect('race');
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -6227,6 +6450,11 @@ function toTitle() {
 const UNLOCK_KEY = 'oyakart.unlocked';
 let unlocked = 0, justUnlocked = -1;
 try { unlocked = clamp(parseInt(localStorage.getItem(UNLOCK_KEY), 10) || 0, 0, LEVELS.length - 1); } catch (e) { unlocked = 0; }
+// the chosen driver (remembered in this browser)
+const DRIVER_KEY = 'oyakart.driver';
+try { const d = ROSTER.findIndex(r => r.id === localStorage.getItem(DRIVER_KEY)); if (d >= 0) playerDef = d; } catch (e) { /* default driver */ }
+function saveDriver() { try { localStorage.setItem(DRIVER_KEY, ROSTER[playerDef].id); } catch (e) { /* this session only */ } }
+
 // best Grand Prix finish per cup: 1 gold, 2 silver, 3 bronze (remembered in this browser)
 const TROPHY_KEY = 'oyakart.trophies';
 let trophies = [];
@@ -6360,19 +6588,187 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  if (state === 'select') { updateSelect(dt); renderer.render(SEL.scene, SEL.cam); return; }
   if (state !== 'paused') step(dt);
   renderer.render(scene, camera);
 }
 
-// ------------------------------------------------------------------ menus
-const chips = $('#chips');
-ROSTER.forEach((d, i) => {
-  const b = document.createElement('button');
-  b.className = 'chip'; b.id = 'drv' + i;
-  b.innerHTML = `${driverDot(i)}<span>${d.name}<small>${d.tag}</small></span>`;
-  b.addEventListener('click', () => { playerDef = i; syncMenu(); buildGrid(); });
-  chips.appendChild(b);
+// ------------------------------------------------------------------ driver select
+// A carousel of standing drivers on their own small stage, built the first time it opens and kept.
+// The chosen driver sits in the middle and dances when they arrive; the neighbours idle either side.
+const SEL = { scene: null, cam: null, cards: [], pos: 0, target: 0, mode: 'race', cup: 0, t: 0, glow: null, top: null };
+const wrapIdx = i => ((i % ROSTER.length) + ROSTER.length) % ROSTER.length;
+function buildSelect() {
+  const sc = new THREE.Scene();
+  sc.background = new THREE.CanvasTexture(makeCanvas(4, 256, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#2b1a63'); gr.addColorStop(0.5, '#8d3a93'); gr.addColorStop(0.78, '#e2607a'); gr.addColorStop(1, '#ffa94d');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  }));
+  sc.fog = new THREE.Fog(0xb14e85, 16, 46);
+  sc.add(new THREE.HemisphereLight(0xfff0f8, 0x4a2f7a, 0.62));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.5); sun.position.set(3, 6, 8); sc.add(sun);
+  // a spotlight on the middle of the stage: the chosen driver is lit, the neighbours less so
+  const spot = new THREE.SpotLight(0xffffff, 0.85, 18, 0.36, 0.7);
+  spot.position.set(0, 8, 5); spot.target.position.set(0, 1, 0); sc.add(spot, spot.target);
+  const add = (geo, m, x, y, z, parent = sc) => { const o = new THREE.Mesh(facet(geo), m); o.position.set(x, y, z); parent.add(o); return o; };
+
+  // low-poly ground: a bumpy field of purple facets, flat near the stage
+  const ground = new THREE.PlaneGeometry(80, 44, 32, 18).rotateX(-Math.PI / 2).toNonIndexed();
+  const gpos = ground.attributes.position, cols = [], pal = [0x5b3fa8, 0x6a4bc0, 0x4f3896, 0x7356cf, 0x5e44b4].map(c => new THREE.Color(c));
+  for (let i = 0; i < gpos.count; i++) {
+    const x = gpos.getX(i), z = gpos.getZ(i), r = Math.hypot(x, z + 2);
+    gpos.setY(i, r < 7 ? 0 : (hash(Math.round(x * 3) * 7.1 + Math.round(z * 3) * 1.3) - 0.3) * Math.min((r - 7) * 0.12, 1.2));
+  }
+  for (let i = 0; i < gpos.count; i += 3) { const c = pal[Math.floor(hash(i * 0.37) * pal.length)]; for (let k = 0; k < 3; k++) cols.push(c.r, c.g, c.b); }
+  ground.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  ground.computeVertexNormals();
+  const gm = new THREE.Mesh(ground, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  gm.position.y = -0.02; sc.add(gm);
+  // pastel hills, palms and a glowing ring in the chosen driver's colour
+  [[-16, -22, 7, 6, 0xff8fb1], [-6, -26, 9, 8, 0xffb36b], [6, -24, 8, 7, 0xa98bff], [17, -21, 7, 5, 0xff7aa8], [-24, -16, 5, 4, 0xc28bff], [25, -15, 6, 4, 0xffc46b]]
+    .forEach(([x, z, r, h, c]) => add(new THREE.ConeGeometry(r, h, 6), lambert({ color: c }), x, h / 2 - 0.3, z));
+  const trunk = lambert({ color: 0x8a5a3a }), frond = lambert({ color: 0x2ec27e }), palms = new THREE.Group();
+  [[-7.5, -6, 1], [-10, -9, 1.2], [8, -7, 1.1], [10.5, -10, 0.9], [-5.5, -11, 0.8], [5, -12, 1]].forEach(([x, z, s]) => {
+    add(new THREE.CylinderGeometry(0.12 * s, 0.18 * s, 3.2 * s, 5), trunk, x, 1.6 * s, z, palms).rotation.z = 0.08;
+    for (let k = 0; k < 6; k++) {
+      const f = add(new THREE.ConeGeometry(0.28 * s, 1.8 * s, 4), frond, x + Math.sin(k) * 0.7 * s, 3.2 * s, z + Math.cos(k) * 0.7 * s, palms);
+      f.rotation.set(Math.cos(k) * 1.2, 0, -Math.sin(k) * 1.2);
+    }
+  });
+  mergeStatic(palms, []); // two meshes for all the palms
+  sc.add(palms);
+  SEL.glow = new THREE.MeshBasicMaterial({ color: ROSTER[0].color });
+  add(new THREE.TorusGeometry(2.5, 0.14, 6, 28), SEL.glow, 0, 1.7, -4.5);
+  add(new THREE.TorusGeometry(2.05, 0.06, 5, 28), new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, 1.7, -4.6);
+  // floating confetti
+  SEL.confetti = [];
+  for (let i = 0; i < 46; i++) {
+    const m = add(new THREE.TetrahedronGeometry(0.1 + hash(i) * 0.08, 0), new THREE.MeshBasicMaterial({ color: [0xffd23f, 0xff6fb5, 0x4fc3ff, 0x2ec27e, 0xffffff][i % 5] }),
+      (hash(i + 3) - 0.5) * 22, 1 + hash(i + 5) * 6, -3 - hash(i + 9) * 10);
+    m.userData.y = m.position.y; SEL.confetti.push(m);
+  }
+  // a podium for each driver, in their kart colour
+  SEL.cards = ROSTER.map((def, i) => {
+    const group = new THREE.Group(), drv = makeDriver(def, true);
+    const top = lambert({ color: def.color });
+    const pod = new THREE.Mesh(facet(new THREE.CylinderGeometry(0.85, 0.95, 0.22, 9)), top);
+    pod.position.y = 0.11;
+    const rim = new THREE.Mesh(facet(new THREE.CylinderGeometry(0.97, 0.97, 0.06, 9)), lambert({ color: 0xffffff }));
+    rim.position.y = 0.03;
+    drv.group.position.y = 0.22;
+    group.add(pod, rim, drv.group);
+    sc.add(group);
+    return { group, drv, w: 0, dt: -1, danced: false, ph: i * 1.3 };
+  });
+  SEL.scene = sc;
+  SEL.cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+}
+
+function updateSelect(dt) {
+  SEL.t += dt;
+  const cam = SEL.cam, aspect = innerWidth / innerHeight;
+  if (cam.aspect !== aspect) {
+    cam.aspect = aspect;
+    // keep both neighbours in view on narrower screens by stepping back
+    const dist = 7.2 * clamp(1.9 / aspect, 1, 1.6);
+    cam.position.set(0, 1.75, dist); cam.lookAt(0, 1.05, 0);
+    cam.updateProjectionMatrix();
+  }
+  SEL.pos += (SEL.target - SEL.pos) * (1 - Math.exp(-9 * dt));
+  if (Math.abs(SEL.target - SEL.pos) < 0.002) SEL.pos = SEL.target;
+  const n = ROSTER.length, cur = wrapIdx(SEL.target), settled = Math.abs(SEL.target - SEL.pos) < 0.06;
+  SEL.cards.forEach((c, i) => {
+    const d = ((i - SEL.pos) % n + n + n / 2) % n - n / 2; // -3..3, so the carousel wraps round
+    const ad = Math.abs(d), near = Math.min(ad, 1), far = Math.max(ad - 1, 0);
+    // only the previous and next drivers show beside the chosen one; the rest shrink away
+    const size = (1 - near * 0.2) * (1 - ramp(ad, 1.15, 1.85));
+    c.group.visible = size > 0.01;
+    c.group.position.set(Math.sign(d) * (near * 2.7 + far * 1.8), 0, -near * 1.3 - far * 1.6);
+    c.group.scale.setScalar(Math.max(size, 0.01));
+    c.group.rotation.y = -d * 0.3;
+    // the dance starts once the carousel stops on a driver, and fades into the idle at its end or
+    // as soon as the carousel moves on
+    const chosen = i === cur, dance = DANCES[ROSTER[i].id];
+    if (!chosen) c.danced = false;
+    else if (settled && !c.danced) { c.danced = true; c.dt = 0; }
+    let want = 0;
+    if (c.dt >= 0) {
+      c.dt += dt;
+      want = chosen && c.dt < dance.len - 0.35 ? 1 : 0;
+      if (!want && c.w < 0.01) c.dt = -1;
+    }
+    c.w += (want - c.w) * (1 - Math.exp(-(want ? 14 : 7) * dt));
+    if (!c.group.visible) return;
+    const P = idlePose(SEL.t, c.ph);
+    if (c.dt >= 0) over(P, dance.at(Math.min(c.dt, dance.len)), c.w);
+    c.drv.rig(P);
+  });
+  SEL.glow.color.lerp(tmpCol.setHex(ROSTER[cur].color), 1 - Math.exp(-6 * dt));
+  for (const [i, m] of SEL.confetti.entries()) {
+    m.rotation.set(SEL.t * (0.6 + hash(i) * 0.8), SEL.t * 0.9 + i, 0);
+    m.position.y = m.userData.y + Math.sin(SEL.t * 0.8 + i) * 0.25;
+  }
+}
+const tmpCol = new THREE.Color();
+
+function syncSelect() {
+  const i = wrapIdx(SEL.target), d = ROSTER[i];
+  $('#selName').textContent = d.name;
+  $('#selTag').textContent = d.tag;
+  $('#selTag').style.color = hexCss(d.color);
+  $('#selBio').textContent = d.bio;
+  $('#selBar').style.background = hexCss(d.color);
+  $('#selDots').querySelectorAll('i').forEach((el, k) => el.classList.toggle('on', k === i));
+  $('#selGo').textContent = SEL.mode === 'gp' ? "LET'S RACE! · Grand Prix" : "LET'S RACE!";
+}
+function selMove(d) { SEL.target += d; syncSelect(); }
+// mode 'race' starts a single race on the chosen track, 'gp' starts the Grand Prix for cup
+function openSelect(mode, cup = 0) {
+  if (net) return;
+  if (!SEL.scene) buildSelect();
+  SEL.mode = mode; SEL.cup = cup;
+  SEL.target = SEL.pos = playerDef;
+  for (const c of SEL.cards) { c.danced = false; c.dt = -1; c.w = 0; }
+  state = 'select';
+  document.body.classList.add('selecting');
+  $('#title').hidden = true;
+  $('#select').hidden = false;
+  syncSelect();
+  $('#selGo').focus({ preventScroll: true });
+}
+function selectBack() {
+  $('#select').hidden = true;
+  document.body.classList.remove('selecting');
+  state = 'title';
+  $('#title').hidden = false;
+  syncMenu();
+}
+function selectGo() {
+  playerDef = wrapIdx(SEL.target);
+  saveDriver();
+  if (SEL.mode === 'gp' && !cupOpen(SEL.cup)) { selectBack(); return; }
+  $('#select').hidden = true;
+  document.body.classList.remove('selecting');
+  if (SEL.mode === 'gp') startGP(SEL.cup);
+  else { gp = null; startRace(); }
+}
+ROSTER.forEach(() => $('#selDots').appendChild(document.createElement('i')));
+$('#selPrev').addEventListener('click', () => selMove(-1));
+$('#selNext').addEventListener('click', () => selMove(1));
+$('#selBack').addEventListener('click', selectBack);
+$('#selGo').addEventListener('click', selectGo);
+// swipe left or right on phones
+let selSwipe = null;
+$('#select').addEventListener('pointerdown', e => { if (!e.target.closest('button')) selSwipe = e.clientX; });
+$('#select').addEventListener('pointerup', e => {
+  if (selSwipe === null) return;
+  const dx = e.clientX - selSwipe; selSwipe = null;
+  if (Math.abs(dx) > 40) selMove(dx < 0 ? 1 : -1);
 });
+
+// ------------------------------------------------------------------ menus
+$('#drvPick').addEventListener('click', () => openSelect('race'));
 $('#trackCount').textContent = LEVELS.length;
 const tracksEl = $('#tracks');
 // cup tabs and track cards: one set on the title screen, one in the online lobby
@@ -6411,7 +6807,8 @@ let menuCup = 0;
 buildTrackPicker($('#cupTabs'), tracksEl, n => { menuCup = n; syncMenu(); }, i => selectLevel(i));
 document.querySelectorAll('#classSeg button').forEach(b => b.addEventListener('click', () => { cls = b.dataset.c; syncMenu(); }));
 function syncMenu() {
-  chips.querySelectorAll('.chip').forEach((b, i) => b.setAttribute('aria-pressed', String(i === playerDef)));
+  const me = ROSTER[playerDef];
+  $('#drvPick').innerHTML = `${driverDot(playerDef)}<span>${me.name}<small>${me.tag}</small></span><b class="drv-change">Change</b>`;
   syncTrackPicker($('#cupTabs'), tracksEl, menuCup, levelIdx, i => `Top 3 on ${LEVELS[i - 1].name} to unlock`);
   const tr = trophies[menuCup], open = cupOpen(menuCup);
   $('#cupTag').textContent = CUPS[menuCup].tag + (tr ? ` · Grand Prix ${TROPHIES[tr - 1].toLowerCase()} trophy` : '');
@@ -6449,8 +6846,8 @@ resetBtn.addEventListener('click', () => {
   resetBtn.textContent = 'Progress reset';
   resetArmTimer = setTimeout(disarmReset, 1500);
 });
-$('#startBtn').addEventListener('click', () => { gp = null; startRace(); });
-$('#gpBtn').addEventListener('click', () => startGP(menuCup));
+$('#startBtn').addEventListener('click', () => openSelect('race'));
+$('#gpBtn').addEventListener('click', () => { if (cupOpen(menuCup)) openSelect('gp', menuCup); });
 $('#resumeBtn').addEventListener('click', () => setPaused(false));
 $('#restartBtn').addEventListener('click', startRace);
 $('#quitBtn').addEventListener('click', () => { if (net) leaveOnline(); else toTitle(); });
