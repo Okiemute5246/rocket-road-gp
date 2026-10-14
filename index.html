@@ -5220,32 +5220,84 @@ const PORTRAITS = (() => {
 // the driver's colour dot in the menus, with their portrait when there is one
 const driverDot = i => `<i class="face" style="background:${hexCss(ROSTER[i].color)}${PORTRAITS[i] ? ` url(${PORTRAITS[i]}) center / cover` : ''}"></i>`;
 
+// shared kart materials: dark grey caps on the bodywork, and the light cockpit tub
+const capMat = lambert({ color: 0x484c58 });
+const tubMat = lambert({ color: 0xd3d7e2 });
+
+// A low-poly sports kart: two-tone side pods, a raised nose panel, a wraparound front bumper, an
+// engine with twin exhausts behind the seat, and chunky faceted tyres. Painted in the driver's kart
+// colour, with a stripe in their outfit colour.
 function makeKartMesh(def) {
   const group = new THREE.Group(), body = new THREE.Group();
   group.rotation.order = 'YXZ';
   group.add(body);
-  const paint = lambert({ color: def.color });
-  const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
-  add(new THREE.BoxGeometry(1.7, 0.45, 2.9), paint, 0, 0.55, 0);
-  add(new THREE.BoxGeometry(1.2, 0.35, 0.9), paint, 0, 0.55, 1.75);
-  add(new THREE.BoxGeometry(2.1, 0.25, 0.45), darkMat, 0, 0.42, 2.2);
-  add(new THREE.BoxGeometry(2.3, 0.3, 1.0), darkMat, 0, 0.45, -0.1);
-  add(new THREE.BoxGeometry(1.1, 0.6, 0.35), darkMat, 0, 1.05, -0.8);
-  const column = add(new THREE.CylinderGeometry(0.035, 0.035, 0.72, 6), darkMat, 0, 1.0, 0.73); // steering column
+  const paint = lambert({ color: def.color }), trim = lambert({ color: def.look.top });
+  const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(facet(geo), mat); m.position.set(x, y, z); parent.add(m); return m; };
+  const box = (w, h, d, mat, x, y, z) => add(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
+  const tube = (a, b, r, mat, sides = 7) => { const m = new THREE.Mesh(facet(new THREE.CylinderGeometry(r, r, 1, sides)), mat); setLimb(m, a, b); body.add(m); return m; };
+
+  // cockpit tub the driver sits in, and the seat
+  box(1.2, 0.42, 2.5, paint, 0, 0.54, 0.25);
+  box(1.0, 0.03, 1.5, tubMat, 0, 0.765, 0.45); // floor plate
+  box(0.9, 0.12, 0.7, darkMat, 0, 0.81, -0.45);
+  box(0.95, 0.78, 0.16, darkMat, 0, 1.1, -0.78).rotation.x = -0.15;
+  box(0.55, 0.1, 0.18, darkMat, 0, 1.55, -0.86).rotation.x = -0.15; // headrest bar
+  const column = add(new THREE.CylinderGeometry(0.035, 0.035, 0.72, 6), metalMat, 0, 1.0, 0.73); // steering column
   column.rotation.x = -0.86;
-  add(new THREE.BoxGeometry(2.1, 0.1, 0.5), paint, 0, 1.35, -1.5);
-  add(new THREE.BoxGeometry(0.1, 0.55, 0.1), darkMat, 0.6, 1.05, -1.45);
-  add(new THREE.BoxGeometry(0.1, 0.55, 0.1), darkMat, -0.6, 1.05, -1.45);
-  for (const x of [-0.4, 0.4]) {
-    const ex = add(new THREE.CylinderGeometry(0.13, 0.13, 0.45, 8), metalMat, x, 0.65, -1.55);
-    ex.rotation.x = Math.PI / 2;
+
+  // side pods: colour below, a grey cap on top, the outfit stripe along the side
+  for (const s of [-1, 1]) {
+    box(0.42, 0.28, 1.1, paint, s * 0.98, 0.46, 0.1);
+    box(0.46, 0.08, 1.16, capMat, s * 0.98, 0.63, 0.1);
+    box(0.38, 0.2, 0.18, paint, s * 0.98, 0.42, 0.72).rotation.x = 0.45; // bevelled ends
+    box(0.38, 0.2, 0.18, paint, s * 0.98, 0.42, -0.52).rotation.x = -0.45;
+    box(0.02, 0.06, 1.0, trim, s * 1.2, 0.5, 0.1);
   }
+  // raised nose panel in front of the wheel, with the stripe down its middle
+  const nose = box(0.95, 0.06, 1.25, paint, 0, 0.82, 1.42); nose.rotation.x = 0.62;
+  const stripe = box(0.14, 0.065, 1.25, trim, 0, 0.825, 1.42); stripe.rotation.x = 0.62;
+  // wraparound front bumper
+  box(1.9, 0.2, 0.28, paint, 0, 0.36, 2.06);
+  box(1.94, 0.07, 0.32, capMat, 0, 0.49, 2.06);
+  for (const s of [-1, 1]) {
+    box(0.26, 0.2, 0.42, paint, s * 0.84, 0.36, 1.86).rotation.y = s * 0.35;
+    box(0.3, 0.07, 0.46, capMat, s * 0.84, 0.49, 1.86).rotation.y = s * 0.35;
+  }
+  // rear bumper, axles
+  box(1.75, 0.2, 0.24, paint, 0, 0.4, -1.98);
+  box(1.79, 0.07, 0.28, capMat, 0, 0.53, -1.98);
+  tube(new V3(-1.1, 0.5, -1.05), new V3(1.1, 0.5, -1.05), 0.05, metalMat, 6);
+  tube(new V3(-1.05, 0.42, 1.15), new V3(1.05, 0.42, 1.15), 0.045, metalMat, 6);
+  // engine behind the seat, with cooling fins and twin exhausts angled up and back
+  box(0.72, 0.42, 0.5, metalMat, 0, 0.72, -1.3);
+  for (const x of [-0.22, 0, 0.22]) box(0.06, 0.12, 0.46, darkMat, x, 0.99, -1.3);
+  for (const s of [-1, 1]) {
+    tube(new V3(s * 0.3, 0.8, -1.38), new V3(s * 0.42, 1.18, -1.88), 0.12, capMat);
+    tube(new V3(s * 0.42, 1.18, -1.88), new V3(s * 0.44, 1.24, -1.96), 0.13, darkMat);
+  }
+  // a whip aerial with a pennant in the outfit colour
+  tube(new V3(-0.62, 0.7, -1.2), new V3(-0.66, 2.1, -1.32), 0.012, tubMat, 4);
+  box(0.02, 0.16, 0.3, trim, -0.66, 2.02, -1.47);
+
+  // chunky tyres with bolted hubs
   const wheels = [];
   for (const [x, z, r] of [[-1.05, 1.15, 0.42], [1.05, 1.15, 0.42], [-1.1, -1.05, 0.5], [1.1, -1.05, 0.5]]) {
-    const wgeo = new THREE.CylinderGeometry(r, r, 0.5, 14).rotateZ(Math.PI / 2);
-    const w = add(wgeo, darkMat, x, r, z);
+    const w = new THREE.Group();
+    w.add(new THREE.Mesh(facet(new THREE.CylinderGeometry(r, r, 0.46, 10).rotateZ(Math.PI / 2)), darkMat));
+    w.add(new THREE.Mesh(facet(new THREE.CylinderGeometry(r * 0.94, r * 0.94, 0.52, 10).rotateZ(Math.PI / 2)), darkMat));
+    w.add(new THREE.Mesh(facet(new THREE.CylinderGeometry(r * 0.55, r * 0.55, 0.54, 8).rotateZ(Math.PI / 2)), metalMat));
+    for (let k = 0; k < 5; k++) {
+      const a = k / 5 * TAU;
+      for (const s of [-1, 1]) {
+        const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, 0.06), darkMat);
+        bolt.position.set(s * 0.28, Math.cos(a) * r * 0.3, Math.sin(a) * r * 0.3);
+        w.add(bolt);
+      }
+    }
+    mergeStatic(w, []);
+    w.position.set(x, r, z);
     w.rotation.order = 'YXZ';
-    add(new THREE.BoxGeometry(0.54, r * 1.3, 0.16), metalMat, 0, 0, 0, w);
+    body.add(w);
     wheels.push(w);
   }
   mergeStatic(body, wheels); // one mesh per colour instead of ~25 parts; the wheels still turn
@@ -5301,7 +5353,7 @@ function nameTag(text, color) {
 
 // spec (online only): one { def, id, name } per grid slot, front row first; id is null for computer rivals
 function buildGrid(spec) {
-  const shared = new Set([darkMat, metalMat, shadowMat]);
+  const shared = new Set([darkMat, metalMat, shadowMat, capMat, tubMat]);
   for (const k of karts) {
     scene.remove(k.mesh.group);
     k.mesh.group.traverse(o => {
@@ -6263,7 +6315,7 @@ function updateKartVisual(k, dt) {
   }
   if (k.boost > 0) {
     for (const x of [-0.4, 0.4]) {
-      m.body.localToWorld(tmpV.set(x, 0.65, -1.85));
+      m.body.localToWorld(tmpV.set(x * 1.1, 1.24, -1.98)); // out of the exhaust tips
       const bx = -Math.sin(k.h) * 8, bz = -Math.cos(k.h) * 8;
       emit(sparks, tmpV.x, tmpV.y, tmpV.z, bx + rand(-1, 1), rand(0, 1.5), bz + rand(-1, 1), Math.random() < 0.5 ? 0xFF8A1F : 0xFFD23F, 0.22, 0.9);
     }
